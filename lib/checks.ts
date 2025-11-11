@@ -122,10 +122,9 @@ async function checkOpenAI(config: ProviderConfig): Promise<CheckResult> {
   const payload = {
     model: config.model,
     messages: [
-      { role: "system", content: "You are a health check endpoint." },
-      { role: "user", content: "ping" },
+      { role: "user", content: "hi" }, // 最简短的消息,移除不必要的 system
     ],
-    max_tokens: 3,
+    max_tokens: 1, // 仅需1个token即可确认服务可用
     temperature: 0,
     stream: true, // 启用流式响应
   };
@@ -156,9 +155,13 @@ async function checkGemini(config: ProviderConfig): Promise<CheckResult> {
     contents: [
       {
         role: "user",
-        parts: [{ text: "ping" }],
+        parts: [{ text: "1" }], // 最简短的单字符消息
       },
     ],
+    generationConfig: {
+      maxOutputTokens: 1, // 限制输出仅1个token
+      temperature: 0,
+    },
   };
 
   return runStreamCheck(config, {
@@ -176,8 +179,8 @@ async function checkAnthropic(config: ProviderConfig): Promise<CheckResult> {
   const url = ensurePath(config.endpoint, "/v1/messages");
   const payload = {
     model: config.model,
-    max_tokens: 10,
-    messages: [{ role: "user", content: "ping" }],
+    max_tokens: 1, // 仅需1个token
+    messages: [{ role: "user", content: "hi" }], // 最简短的消息
     stream: true, // 启用流式响应
   };
 
