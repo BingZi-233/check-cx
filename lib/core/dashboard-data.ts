@@ -11,7 +11,7 @@ import { runProviderChecks } from "../providers";
 import { appendHistory, loadHistory } from "../database/history";
 import { getPollingIntervalLabel, getPollingIntervalMs } from "./polling-config";
 import { getPingCacheEntry } from "./global-state";
-import { getOfficialStatus } from "./official-status-poller";
+import { ensureOfficialStatusPoller, getOfficialStatus } from "./official-status-poller";
 import type {
   ProviderTimeline,
   DashboardData,
@@ -30,6 +30,7 @@ import type {
 export async function loadDashboardData(options?: {
   refreshMode?: RefreshMode;
 }): Promise<DashboardData> {
+  ensureOfficialStatusPoller();
   const configs = await loadProviderConfigsFromDB();
   const allowedIds = new Set(configs.map((item) => item.id));
   const pollIntervalMs = getPollingIntervalMs();
