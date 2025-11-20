@@ -6,9 +6,10 @@ import { ProviderIcon } from "@/components/provider-icon";
 import { StatusTimeline } from "@/components/status-timeline";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import type { DashboardData } from "@/lib/types";
 import { PROVIDER_LABEL, STATUS_META, OFFICIAL_STATUS_META } from "@/lib/core/status";
-import { formatLocalTime } from "@/lib/utils";
+import { cn, formatLocalTime } from "@/lib/utils";
 
 interface DashboardViewProps {
   /** 首屏由服务端注入的聚合数据，用作前端轮询的初始快照 */
@@ -168,6 +169,10 @@ export function DashboardView({ initialData }: DashboardViewProps) {
         <section className={`grid gap-6 ${gridColsClass}`}>
           {providerTimelines.map(({ id, latest, items }) => {
             const preset = STATUS_META[latest.status];
+            const officialStatus = latest.officialStatus;
+            const officialStatusMeta = officialStatus
+              ? OFFICIAL_STATUS_META[officialStatus.status]
+              : null;
             return (
               <Card
                 key={id}
@@ -223,13 +228,49 @@ export function DashboardView({ initialData }: DashboardViewProps) {
                         官方状态
                       </p>
                       <p className="mt-1 text-foreground">
-                        {latest.officialStatus ? (
-                          <span
-                            className={OFFICIAL_STATUS_META[latest.officialStatus.status].color}
-                            title={latest.officialStatus.message}
-                          >
-                            {OFFICIAL_STATUS_META[latest.officialStatus.status].label}
-                          </span>
+                        {officialStatus && officialStatusMeta ? (
+                          <HoverCard openDelay={200}>
+                            <HoverCardTrigger asChild>
+                              <span
+                                className={cn(
+                                  "inline-flex cursor-help items-center gap-1 rounded-full border border-transparent px-2 py-0.5 text-sm font-medium transition hover:border-border/80",
+                                  officialStatusMeta.color
+                                )}
+                              >
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full bg-current"
+                                  aria-hidden="true"
+                                />
+                                {officialStatusMeta.label}
+                              </span>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="space-y-2 text-sm">
+                              <div>
+                                <p className="text-base font-medium text-foreground">
+                                  {officialStatusMeta.label}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  最近更新：{formatLocalTime(officialStatus.checkedAt)}
+                                </p>
+                              </div>
+                              <p className="text-sm text-foreground">
+                                {officialStatus.message || "暂无官方说明"}
+                              </p>
+                              {officialStatus.affectedComponents &&
+                                officialStatus.affectedComponents.length > 0 && (
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                      受影响组件
+                                    </p>
+                                    <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-foreground">
+                                      {officialStatus.affectedComponents.map((component, index) => (
+                                        <li key={`${component}-${index}`}>{component}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                            </HoverCardContent>
+                          </HoverCard>
                         ) : (
                           <span className="text-gray-500">—</span>
                         )}
