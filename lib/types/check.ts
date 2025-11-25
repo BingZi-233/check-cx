@@ -25,4 +25,5 @@ export interface CheckResult {
   checkedAt: string; // ISO 8601 timestamp
   message: string;
   officialStatus?: OfficialStatusResult; // 官方服务状态(可选)
+  groupName?: string | null; // 分组名称
 }

@@ -32,7 +32,8 @@ export async function loadHistory(): Promise<HistorySnapshot> {
           name,
           type,
           model,
-          endpoint
+          endpoint,
+          group_name
         )
       `
       )
@@ -63,6 +64,7 @@ export async function loadHistory(): Promise<HistorySnapshot> {
         pingLatencyMs: record.ping_latency_ms ?? null,
         checkedAt: record.checked_at,
         message: record.message || "",
+        groupName: config.group_name || null,
       };
 
       if (!history[result.id]) {

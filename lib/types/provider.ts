@@ -19,6 +19,7 @@ export interface ProviderConfig {
   apiKey: string;
   is_maintenance: boolean;
   userAgent?: string | null;
+  groupName?: string | null;
 }
 
 /**

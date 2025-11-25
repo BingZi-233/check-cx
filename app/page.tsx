@@ -4,7 +4,7 @@ import { loadDashboardData } from "@/lib/core/dashboard-data";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const ESTIMATED_VERSION = "v1.4.0";
+const ESTIMATED_VERSION = "v1.5.0";
 
 export default async function Home() {
   const data = await loadDashboardData({ refreshMode: "missing" });

@@ -20,6 +20,7 @@ export type { OfficialHealthStatus, OfficialStatusResult } from "./official-stat
 export type {
   TimelineItem,
   ProviderTimeline,
+  GroupedProviderTimelines,
   DashboardData,
   RefreshMode,
   PingCacheEntry,

@@ -16,6 +16,7 @@ export interface CheckConfigRow {
   enabled: boolean;
   is_maintenance: boolean;
   user_agent?: string | null;
+  group_name?: string | null;
   created_at?: string;
 }
 

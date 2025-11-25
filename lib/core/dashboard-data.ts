@@ -14,11 +14,64 @@ import { getPingCacheEntry } from "./global-state";
 import { ensureOfficialStatusPoller, getOfficialStatus } from "./official-status-poller";
 import type {
   ProviderTimeline,
+  GroupedProviderTimelines,
   DashboardData,
   RefreshMode,
   HistorySnapshot,
   CheckResult,
 } from "../types";
+
+// 未分组标识常量
+const UNGROUPED_KEY = "__ungrouped__";
+const UNGROUPED_DISPLAY_NAME = "未分组";
+
+/**
+ * 将 ProviderTimeline 列表按分组组织
+ */
+function groupTimelines(timelines: ProviderTimeline[]): GroupedProviderTimelines[] {
+  // 按 groupName 分组
+  const groupMap = new Map<string, ProviderTimeline[]>();
+
+  for (const timeline of timelines) {
+    const groupKey = timeline.latest.groupName || UNGROUPED_KEY;
+    if (!groupMap.has(groupKey)) {
+      groupMap.set(groupKey, []);
+    }
+    groupMap.get(groupKey)!.push(timeline);
+  }
+
+  // 转换为数组并排序
+  const groups: GroupedProviderTimelines[] = [];
+
+  // 先处理有名称的分组（按分组名称字母序）
+  const namedGroups = [...groupMap.entries()]
+    .filter(([key]) => key !== UNGROUPED_KEY)
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  for (const [groupName, groupTimelines] of namedGroups) {
+    groups.push({
+      groupName,
+      displayName: groupName,
+      timelines: groupTimelines.sort((a, b) =>
+        a.latest.name.localeCompare(b.latest.name)
+      ),
+    });
+  }
+
+  // 最后处理未分组的（放在最后）
+  const ungrouped = groupMap.get(UNGROUPED_KEY);
+  if (ungrouped && ungrouped.length > 0) {
+    groups.push({
+      groupName: UNGROUPED_KEY,
+      displayName: UNGROUPED_DISPLAY_NAME,
+      timelines: ungrouped.sort((a, b) =>
+        a.latest.name.localeCompare(b.latest.name)
+      ),
+    });
+  }
+
+  return groups;
+}
 
 /**
  * 加载 Dashboard 数据
@@ -142,6 +195,7 @@ export async function loadDashboardData(options?: {
       pingLatencyMs: null,
       message: "配置处于维护模式",
       checkedAt: new Date().toISOString(),
+      groupName: config.groupName || null,
     };
 
     // 附加官方状态
@@ -172,8 +226,12 @@ export async function loadDashboardData(options?: {
   const lastUpdated = allEntries.length ? allEntries[0].checkedAt : null;
   const generatedAt = Date.now();
 
+  // 生成分组数据
+  const groupedTimelines = groupTimelines(providerTimelines);
+
   return {
     providerTimelines,
+    groupedTimelines,
     lastUpdated,
     total: providerTimelines.length,
     pollIntervalLabel,

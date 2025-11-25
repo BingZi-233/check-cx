@@ -19,10 +19,20 @@ export interface ProviderTimeline {
 }
 
 /**
+ * 分组后的 Provider 时间线数据
+ */
+export interface GroupedProviderTimelines {
+  groupName: string; // 分组键（未分组为 "__ungrouped__"）
+  displayName: string; // 显示名称（未分组为 "未分组"）
+  timelines: ProviderTimeline[];
+}
+
+/**
  * Dashboard 完整数据
  */
 export interface DashboardData {
   providerTimelines: ProviderTimeline[];
+  groupedTimelines: GroupedProviderTimelines[]; // 分组后的数据
   lastUpdated: string | null;
   total: number;
   pollIntervalLabel: string;
