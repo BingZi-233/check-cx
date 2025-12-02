@@ -26,8 +26,9 @@ CREATE TABLE public.check_configs (
     api_key text NOT NULL,
     enabled boolean DEFAULT true,
     is_maintenance boolean DEFAULT false,
-    user_agent text,
+    request_header jsonb,
     group_name text,
+    metadata jsonb,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     CONSTRAINT check_configs_pkey PRIMARY KEY (id)
@@ -151,9 +152,10 @@ COMMENT ON COLUMN public.check_configs.model IS '模型名称 - 如 gpt-4o-mini,
 COMMENT ON COLUMN public.check_configs.endpoint IS 'API 端点 URL - 完整的 API 调用地址';
 COMMENT ON COLUMN public.check_configs.api_key IS 'API 密钥 - 用于身份验证的密钥,明文存储(依赖 RLS 保护)';
 COMMENT ON COLUMN public.check_configs.enabled IS '是否启用 - true: 启用检测, false: 禁用检测';
-COMMENT ON COLUMN public.check_configs.is_maintenance IS '维护模式标记 - true: 停止健康检查, false: 正常检查';
-COMMENT ON COLUMN public.check_configs.user_agent IS '自定义 User-Agent - 用于请求时的 User-Agent 头,为 NULL 时使用默认值';
-COMMENT ON COLUMN public.check_configs.group_name IS '配置分组名称 - Dashboard 分组展示使用, NULL 表示未分组';
+COMMENT ON COLUMN public.check_configs.is_maintenance IS '维护模式标记 - true 时停止健康检查';
+COMMENT ON COLUMN public.check_configs.request_header IS '自定义请求头，JSONB 格式，如 {"User-Agent": "xxx"}';
+COMMENT ON COLUMN public.check_configs.group_name IS '配置分组名称，用于 Dashboard 卡片分组展示，NULL 表示未分组';
+COMMENT ON COLUMN public.check_configs.metadata IS '自定义请求参数，JSONB 格式，会合并到请求体中';
 COMMENT ON COLUMN public.check_configs.created_at IS '创建时间 - 配置首次创建的时间戳';
 COMMENT ON COLUMN public.check_configs.updated_at IS '更新时间 - 配置最后修改的时间戳,由触发器自动维护';
 
@@ -174,7 +176,7 @@ RETURNS TABLE (
   config_id uuid,
   status text,
   latency_ms integer,
-  ping_latency_ms integer,
+  ping_latency_ms double precision,
   checked_at timestamptz,
   message text,
   name text,
