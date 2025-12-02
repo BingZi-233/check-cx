@@ -111,15 +111,22 @@ function deriveOpenAIBaseURL(endpoint: string | null | undefined): string {
  */
 function getOpenAIClient(config: ProviderConfig): OpenAI {
   const baseURL = deriveOpenAIBaseURL(config.endpoint);
-  const cacheKey = `${baseURL}::${config.apiKey}`;
+  // 缓存 key 必须包含 requestHeaders，否则不同 header 配置会共用同一个客户端
+  const headersKey = config.requestHeaders
+    ? JSON.stringify(config.requestHeaders)
+    : "";
+  const cacheKey = `${baseURL}::${config.apiKey}::${headersKey}`;
 
   const cached = openAIClientCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  // 使用自定义 User-Agent 或默认值
-  const userAgent = config.userAgent || "check-cx/0.1.0";
+  // 构建默认 headers，如果没有自定义 User-Agent 则使用默认值
+  const defaultHeaders: Record<string, string> = {
+    "User-Agent": "check-cx/0.1.0",
+    ...(config.requestHeaders || {}),
+  };
 
   const client = new OpenAI({
     apiKey: config.apiKey,
@@ -127,9 +134,7 @@ function getOpenAIClient(config: ProviderConfig): OpenAI {
     // 某些代理/网关（例如启用了 Cloudflare「封锁 AI 爬虫」规则的站点）
     // 会对默认的 OpenAI User-Agent（如 `OpenAI/TS ...`）返回 402 Your request was blocked.
     // 这里统一改成一个普通应用的 UA，避免被误判为爬虫。
-    defaultHeaders: {
-      "User-Agent": userAgent,
-    },
+    defaultHeaders,
     // 禁用 Next.js fetch 缓存，避免 AbortController 中止请求时的缓存错误
     fetch: (url, init) =>
       fetch(url, { ...init, cache: "no-store" }),
@@ -162,20 +167,27 @@ function deriveResponsesBaseURL(endpoint: string): string {
  */
 function getResponsesClient(config: ProviderConfig): OpenAI {
   const baseURL = deriveResponsesBaseURL(config.endpoint!);
-  const userAgent = config.userAgent || "check-cx/0.1.0";
-  const cacheKey = `responses::${baseURL}::${config.apiKey}::${userAgent}`;
+  // 缓存 key 必须包含 requestHeaders
+  const headersKey = config.requestHeaders
+    ? JSON.stringify(config.requestHeaders)
+    : "";
+  const cacheKey = `responses::${baseURL}::${config.apiKey}::${headersKey}`;
 
   const cached = openAIClientCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
+  // 构建默认 headers，如果没有自定义 User-Agent 则使用默认值
+  const defaultHeaders: Record<string, string> = {
+    "User-Agent": "check-cx/0.1.0",
+    ...(config.requestHeaders || {}),
+  };
+
   const client = new OpenAI({
     apiKey: config.apiKey,
     baseURL,
-    defaultHeaders: {
-      "User-Agent": userAgent,
-    },
+    defaultHeaders,
     // 禁用 Next.js fetch 缓存，避免 AbortController 中止请求时的缓存错误
     fetch: (url, init) =>
       fetch(url, { ...init, cache: "no-store" }),
@@ -208,6 +220,8 @@ async function checkOpenAIResponses(
       model: requestModel,
       input: [{ type: "message", role: "user", content: "hi" }],
       stream: true,
+      // 合并 metadata 中的自定义参数
+      ...(config.metadata || {}),
     };
 
     // Responses API 使用 reasoning.effort 而非 reasoning_effort
@@ -308,6 +322,8 @@ export async function checkOpenAI(
       max_tokens: 1,
       temperature: 0,
       stream: true,
+      // 合并 metadata 中的自定义参数
+      ...(config.metadata as Partial<ChatCompletionCreateParamsStreaming> || {}),
     };
 
     if (reasoningEffort) {

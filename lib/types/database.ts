@@ -15,7 +15,8 @@ export interface CheckConfigRow {
   api_key: string;
   enabled: boolean;
   is_maintenance: boolean;
-  user_agent?: string | null;
+  request_header?: Record<string, string> | null;
+  metadata?: Record<string, unknown> | null;
   group_name?: string | null;
   created_at?: string;
 }

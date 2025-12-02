@@ -79,9 +79,10 @@ lib/
 配置已从环境变量迁移到 Supabase 数据库的 `check_configs` 表:
 
 - **配置加载**: `lib/database/config-loader.ts:loadProviderConfigsFromDB()` 从数据库读取已启用的配置
-- **表结构**: 包含 `id`(UUID)、`name`、`type`、`model`、`endpoint`、`api_key`、`enabled`、`user_agent` 字段
+- **表结构**: 包含 `id`(UUID)、`name`、`type`、`model`、`endpoint`、`api_key`、`enabled`、`request_header`、`metadata` 字段
 - **动态启用/禁用**: 通过更新数据库 `enabled` 字段即可控制检测任务,无需重启应用
-- **自定义 User-Agent**: 通过配置 `user_agent` 字段自定义请求头,可绕过特定的 API 请求限制
+- **自定义请求头**: 通过配置 `request_header` 字段自定义多个请求头（JSON 格式）,可绕过特定的 API 请求限制
+- **自定义请求参数**: 通过配置 `metadata` 字段（JSONB）自定义请求体参数,会合并到 API 请求中
 - **类型安全**: 使用 `lib/types/database.ts` 中定义的 `CheckConfigRow` 类型
 
 ### 健康检查流程
@@ -138,7 +139,8 @@ check_configs (
   endpoint TEXT NOT NULL,
   api_key TEXT NOT NULL,
   enabled BOOLEAN DEFAULT true,
-  user_agent TEXT  -- 自定义 User-Agent,为 NULL 时使用默认值
+  request_header JSONB,  -- 自定义请求头，如 {"User-Agent": "xxx"}
+  metadata JSONB        -- 自定义请求参数,JSON 格式,会合并到请求体中
 )
 
 -- 历史记录表
@@ -241,20 +243,41 @@ VALUES ('主力 OpenAI', 'openai', 'gpt-4o-mini',
         'https://api.openai.com/v1/chat/completions',
         'sk-xxx', true);
 
--- 添加配置并设置自定义 User-Agent
-INSERT INTO check_configs (name, type, model, endpoint, api_key, enabled, user_agent)
-VALUES ('自定义 UA OpenAI', 'openai', 'gpt-4o-mini',
+-- 添加配置并设置自定义请求头（JSON 格式）
+INSERT INTO check_configs (name, type, model, endpoint, api_key, enabled, request_header)
+VALUES ('自定义请求头配置', 'openai', 'gpt-4o-mini',
         'https://api.example.com/v1/chat/completions',
-        'sk-xxx', true, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+        'sk-xxx', true,
+        '{"User-Agent": "claude-cli/1.0.111 (external, cli)", "X-Custom-Header": "some-value"}');
 
--- 更新已有配置的 User-Agent
+-- 添加配置并设置自定义请求参数（metadata）
+INSERT INTO check_configs (name, type, model, endpoint, api_key, enabled, metadata)
+VALUES ('自定义参数配置', 'openai', 'gpt-4o-mini',
+        'https://api.example.com/v1/chat/completions',
+        'sk-xxx', true,
+        '{"temperature": 0.5, "max_tokens": 50}');
+
+-- 同时设置请求头和 metadata
+INSERT INTO check_configs (name, type, model, endpoint, api_key, enabled, request_header, metadata)
+VALUES ('完整自定义配置', 'openai', 'gpt-4o-mini',
+        'https://api.example.com/v1/chat/completions',
+        'sk-xxx', true,
+        '{"User-Agent": "custom-agent/1.0", "X-Request-Id": "check-cx"}',
+        '{"temperature": 0.7}');
+
+-- 更新已有配置的请求头
 UPDATE check_configs
-SET user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+SET request_header = '{"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}'
 WHERE name = '主力 OpenAI';
 
--- 清除自定义 User-Agent(恢复使用默认值)
+-- 更新已有配置的 metadata
 UPDATE check_configs
-SET user_agent = NULL
+SET metadata = '{"max_tokens": 100}'
+WHERE name = '主力 OpenAI';
+
+-- 清除自定义请求头(恢复使用默认值)
+UPDATE check_configs
+SET request_header = NULL
 WHERE name = '主力 OpenAI';
 
 -- 禁用配置

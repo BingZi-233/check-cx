@@ -57,15 +57,22 @@ function deriveAnthropicBaseURL(
  */
 function getAnthropicClient(config: ProviderConfig): Anthropic {
   const baseURL = deriveAnthropicBaseURL(config.endpoint);
-  // 使用自定义 User-Agent 或默认值
-  const userAgent = config.userAgent || "check-cx/0.1.0";
-  // 缓存 key 必须包含 userAgent，否则不同 UA 配置会共用同一个客户端
-  const cacheKey = `${baseURL}::${config.apiKey}::${userAgent}`;
+  // 缓存 key 必须包含 requestHeaders，否则不同 header 配置会共用同一个客户端
+  const headersKey = config.requestHeaders
+    ? JSON.stringify(config.requestHeaders)
+    : "";
+  const cacheKey = `${baseURL}::${config.apiKey}::${headersKey}`;
 
   const cached = anthropicClientCache.get(cacheKey);
   if (cached) {
     return cached;
   }
+
+  // 构建默认 headers，自定义 headers 会覆盖默认值
+  const defaultHeaders: Record<string, string> = {
+    "User-Agent": "check-cx/0.1.0",
+    ...(config.requestHeaders || {}),
+  };
 
   const client = new Anthropic({
     apiKey: config.apiKey,
@@ -73,9 +80,7 @@ function getAnthropicClient(config: ProviderConfig): Anthropic {
     // 某些代理/网关（例如启用了 Cloudflare「封锁 AI 爬虫」规则的站点）
     // 会对默认的 Anthropic User-Agent（如 `anthropic-ts-sdk/...`）返回 402 Your request was blocked.
     // 这里统一改成一个普通应用的 UA，避免被误判为爬虫。
-    defaultHeaders: {
-      "User-Agent": userAgent,
-    },
+    defaultHeaders,
     // 禁用 Next.js fetch 缓存，避免 AbortController 中止请求时的缓存错误
     fetch: (url, init) =>
       fetch(url, { ...init, cache: "no-store" }),
@@ -108,6 +113,8 @@ export async function checkAnthropic(
         max_tokens: 1, // 仅需 1 个 token 即可确认服务可用
         messages: [{ role: "user", content: "hi" }], // 最简短的消息
         stream: true, // 启用流式响应
+        // 合并 metadata 中的自定义参数
+        ...(config.metadata || {}),
       },
       { signal: controller.signal }
     );
