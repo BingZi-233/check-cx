@@ -10,7 +10,7 @@ import { measureEndpointPing } from "./endpoint-ping";
 /**
  * 默认超时时间 (毫秒)
  */
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 45_000;
 
 /**
  * 性能降级阈值 (毫秒)
@@ -120,8 +120,10 @@ export async function runStreamCheck(
     };
   } catch (error) {
     const err = error as Error & { name?: string };
-    const message =
-      err?.name === "AbortError" ? "请求超时" : err?.message || "未知错误";
+    const isAbortError =
+      err?.name === "AbortError" ||
+      /request was aborted/i.test(err?.message || "");
+    const message = isAbortError ? "请求超时" : err?.message || "未知错误";
     const pingLatencyMs = await pingPromise;
     return {
       id: config.id,

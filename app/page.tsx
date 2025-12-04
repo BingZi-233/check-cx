@@ -1,10 +1,11 @@
 import { DashboardView } from "@/components/dashboard-view";
 import { loadDashboardData } from "@/lib/core/dashboard-data";
+import packageJson from "@/package.json";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const ESTIMATED_VERSION = "v1.8.3";
+const ESTIMATED_VERSION = `v${packageJson.version}`;
 
 export default async function Home() {
   const data = await loadDashboardData({ refreshMode: "missing" });

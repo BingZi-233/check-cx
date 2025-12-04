@@ -4,7 +4,7 @@
  * - /responses 端点使用 Responses API
  */
 
-import OpenAI from "openai";
+import OpenAI, { APIUserAbortError } from "openai";
 import type { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
 
 import type { CheckResult, HealthStatus, ProviderConfig } from "../types";
@@ -16,13 +16,35 @@ import { measureEndpointPing } from "./endpoint-ping";
  * 默认超时时间 (毫秒)
  * 与其他 Provider 保持一致
  */
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 45_000;
 
 /**
  * 性能降级阈值 (毫秒)
  * 与其他 Provider 保持一致
  */
 const DEGRADED_THRESHOLD_MS = 6_000;
+
+const REQUEST_ABORTED_MESSAGE = /request was aborted/i;
+
+function isAbortLikeError(error: Error & { name?: string }): boolean {
+  if (!error) {
+    return false;
+  }
+  if (error.name === "AbortError") {
+    return true;
+  }
+  if (error instanceof APIUserAbortError) {
+    return true;
+  }
+  return REQUEST_ABORTED_MESSAGE.test(error.message || "");
+}
+
+function getOpenAIErrorMessage(error: Error & { name?: string }): string {
+  if (isAbortLikeError(error)) {
+    return "请求超时";
+  }
+  return error?.message || "未知错误";
+}
 
 /**
  * OpenAI 客户端全局缓存
@@ -251,8 +273,7 @@ async function checkOpenAIResponses(
     };
   } catch (error) {
     const err = error as Error & { name?: string };
-    const message =
-      err?.name === "AbortError" ? "请求超时" : err?.message || "未知错误";
+    const message = getOpenAIErrorMessage(err);
 
     const pingLatencyMs = await pingPromise;
     return {
@@ -353,8 +374,7 @@ export async function checkOpenAI(
     };
   } catch (error) {
     const err = error as Error & { name?: string };
-    const message =
-      err?.name === "AbortError" ? "请求超时" : err?.message || "未知错误";
+    const message = getOpenAIErrorMessage(err);
 
     const pingLatencyMs = await pingPromise;
     return {

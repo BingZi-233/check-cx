@@ -4,7 +4,7 @@
  * Gemini 原生 SDK 不支持自定义 baseURL，但可以使用 OpenAI 兼容的请求方式
  */
 
-import OpenAI from "openai";
+import OpenAI, { APIUserAbortError } from "openai";
 import type { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
 
 import type { CheckResult, HealthStatus, ProviderConfig } from "../types";
@@ -15,12 +15,34 @@ import { measureEndpointPing } from "./endpoint-ping";
 /**
  * 默认超时时间 (毫秒)
  */
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 45_000;
 
 /**
  * 性能降级阈值 (毫秒)
  */
 const DEGRADED_THRESHOLD_MS = 6_000;
+
+const REQUEST_ABORTED_MESSAGE = /request was aborted/i;
+
+function isAbortLikeError(error: Error & { name?: string }): boolean {
+  if (!error) {
+    return false;
+  }
+  if (error.name === "AbortError") {
+    return true;
+  }
+  if (error instanceof APIUserAbortError) {
+    return true;
+  }
+  return REQUEST_ABORTED_MESSAGE.test(error.message || "");
+}
+
+function getGeminiErrorMessage(error: Error & { name?: string }): string {
+  if (isAbortLikeError(error)) {
+    return "请求超时";
+  }
+  return error?.message || "未知错误";
+}
 
 /**
  * Gemini 客户端全局缓存
@@ -137,8 +159,7 @@ export async function checkGemini(
     };
   } catch (error) {
     const err = error as Error & { name?: string };
-    const message =
-      err?.name === "AbortError" ? "请求超时" : err?.message || "未知错误";
+    const message = getGeminiErrorMessage(err);
 
     const pingLatencyMs = await pingPromise;
     return {
