@@ -61,6 +61,13 @@ CREATE TABLE public.group_info (
     CONSTRAINT group_info_group_name_key UNIQUE (group_name)
 );
 
+-- Enable RLS on group_info
+ALTER TABLE public.group_info ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow read access for everyone
+CREATE POLICY "Allow public read access" ON public.group_info
+FOR SELECT USING (true);
+
 -- 序列属主
 ALTER SEQUENCE public.check_history_id_seq
     OWNED BY public.check_history.id;

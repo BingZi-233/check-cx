@@ -7,18 +7,26 @@
  * - 结合轮询配置与官方状态，生成 DashboardView 所需的完整数据结构
  */
 import {loadProviderConfigsFromDB} from "../database/config-loader";
+import {loadGroupInfos} from "../database/group-info";
 import {getPollingIntervalLabel, getPollingIntervalMs} from "./polling-config";
 import {ensureOfficialStatusPoller} from "./official-status-poller";
 import {buildProviderTimelines, loadSnapshotForScope} from "./health-snapshot-service";
 import type {DashboardData, GroupedProviderTimelines, ProviderTimeline, RefreshMode,} from "../types";
+import type {GroupInfoRow} from "../types/database";
 import {UNGROUPED_DISPLAY_NAME, UNGROUPED_KEY} from "../types";
 
 /**
  * 将 ProviderTimeline 列表按分组组织
  */
-function groupTimelines(timelines: ProviderTimeline[]): GroupedProviderTimelines[] {
+function groupTimelines(timelines: ProviderTimeline[], groupInfos: GroupInfoRow[]): GroupedProviderTimelines[] {
   // 按 groupName 分组
   const groupMap = new Map<string, ProviderTimeline[]>();
+  
+  // 建立 groupInfo 映射
+  const groupInfoMap = new Map<string, GroupInfoRow>();
+  for (const info of groupInfos) {
+    groupInfoMap.set(info.group_name, info);
+  }
 
   for (const timeline of timelines) {
     const groupKey = timeline.latest.groupName || UNGROUPED_KEY;
@@ -37,9 +45,11 @@ function groupTimelines(timelines: ProviderTimeline[]): GroupedProviderTimelines
     .sort(([a], [b]) => a.localeCompare(b));
 
   for (const [groupName, groupTimelines] of namedGroups) {
+    const info = groupInfoMap.get(groupName);
     groups.push({
       groupName,
       displayName: groupName,
+      websiteUrl: info?.website_url,
       timelines: groupTimelines.sort((a, b) =>
         a.latest.name.localeCompare(b.latest.name)
       ),
@@ -107,8 +117,9 @@ export async function loadDashboardData(options?: {
   const lastUpdated = allEntries.length ? allEntries[0].checkedAt : null;
   const generatedAt = Date.now();
 
+  const groupInfos = await loadGroupInfos();
   // 生成分组数据
-  const groupedTimelines = groupTimelines(providerTimelines);
+  const groupedTimelines = groupTimelines(providerTimelines, groupInfos);
 
   return {
     providerTimelines,

@@ -6,6 +6,7 @@
  * - 获取所有可用的分组列表
  */
 import {loadProviderConfigsFromDB} from "../database/config-loader";
+import {getGroupInfo} from "../database/group-info";
 import {getPollingIntervalLabel, getPollingIntervalMs} from "./polling-config";
 import {ensureOfficialStatusPoller} from "./official-status-poller";
 import {buildProviderTimelines, loadSnapshotForScope} from "./health-snapshot-service";
@@ -24,6 +25,7 @@ export interface GroupDashboardData {
   pollIntervalLabel: string;
   pollIntervalMs: number;
   generatedAt: number;
+  websiteUrl?: string | null;
 }
 
 /**
@@ -112,6 +114,13 @@ export async function loadGroupDashboardData(
   const lastUpdated = allEntries.length ? allEntries[0].checkedAt : null;
   const generatedAt = Date.now();
 
+  // 获取分组信息（仅对有名分组）
+  let websiteUrl: string | undefined | null;
+  if (!isTargetUngrouped) {
+    const groupInfo = await getGroupInfo(targetGroupName);
+    websiteUrl = groupInfo?.website_url;
+  }
+
   return {
     groupName: targetGroupName,
     displayName: isTargetUngrouped ? UNGROUPED_DISPLAY_NAME : targetGroupName,
@@ -121,5 +130,6 @@ export async function loadGroupDashboardData(
     pollIntervalLabel,
     pollIntervalMs,
     generatedAt,
+    websiteUrl,
   };
 }

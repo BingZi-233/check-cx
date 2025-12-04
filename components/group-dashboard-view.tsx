@@ -1,7 +1,7 @@
 "use client";
 
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Activity, Radio, RefreshCcw, Zap} from "lucide-react";
+import {Activity, ExternalLink, Radio, RefreshCcw, Zap} from "lucide-react";
 
 import {ProviderIcon} from "@/components/provider-icon";
 import {StatusTimeline} from "@/components/status-timeline";
@@ -359,9 +359,21 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
             </span>
           </div>
           
-          <h1 className="max-w-2xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-6xl">
-            {displayName}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="max-w-2xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-6xl">
+              {displayName}
+            </h1>
+            {data.websiteUrl && (
+              <a
+                href={data.websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center rounded-full bg-muted/50 p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <ExternalLink className="h-6 w-6" />
+              </a>
+            )}
+          </div>
           
            <div className="flex flex-wrap items-center gap-2.5">
             {statusSummary.operational > 0 && (

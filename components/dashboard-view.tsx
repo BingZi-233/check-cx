@@ -264,7 +264,22 @@ function GroupPanel({
             <ChevronDown className="h-5 w-5 text-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-2xl font-bold tracking-tight text-foreground">{group.displayName}</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="truncate text-2xl font-bold tracking-tight text-foreground">
+                {group.displayName}
+              </h2>
+              {group.websiteUrl && (
+                <a
+                  href={group.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center rounded-full bg-muted/50 p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                {statusSummary.operational > 0 && (
                  <span className="flex items-center gap-1.5 whitespace-nowrap">
