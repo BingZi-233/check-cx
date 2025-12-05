@@ -154,7 +154,7 @@ function ProviderCard({
                       type="button"
                       className={cn(
                         "flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:bg-muted",
-                        officialStatusMeta.color.replace('text-', 'text-')
+                        officialStatusMeta.color.replace('text-', 'bg-')
                       )}
                       onClick={
                         isCoarsePointer
