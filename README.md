@@ -18,7 +18,6 @@
 
   <p>
     <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fbingzi-233%2Fcheck-cx&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY&envDescription=Supabase%20project%20credentials&envLink=https%3A%2F%2Fsupabase.com%2Fdashboard&project-name=check-cx&repository-name=check-cx"><img src="https://vercel.com/button" alt="Deploy with Vercel"/></a>
-    <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/bingzi-233/check-cx"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare Workers"/></a>
   </p>
 
   <img src="docs/images/index.png" alt="Check CX Dashboard" width="60%">
@@ -197,21 +196,6 @@ Check CX 是一套基于 **Next.js 16** + **shadcn/ui** 构建的现代化 AI �
 ```bash
 # 使用 Vercel CLI
 vercel deploy
-```
-
-#### Cloudflare Workers/Pages
-
-> ⚠️ **注意**: Cloudflare Workers 是边缘无状态环境，后台轮询器不会持续运行。建议使用 Cron Triggers 定时触发检测。
-
-```bash
-# 构建 Cloudflare 产物
-pnpm build:cloudflare
-
-# 本地预览
-pnpm preview:cloudflare
-
-# 部署到 Cloudflare
-pnpm deploy:cloudflare
 ```
 
 #### 自建服务器
