@@ -50,6 +50,7 @@ function groupTimelines(timelines: ProviderTimeline[], groupInfos: GroupInfoRow[
       groupName,
       displayName: groupName,
       websiteUrl: info?.website_url,
+      tags: info?.tags ?? null,
       timelines: groupTimelines.sort((a, b) =>
         a.latest.name.localeCompare(b.latest.name)
       ),

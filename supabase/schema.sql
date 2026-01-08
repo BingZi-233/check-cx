@@ -75,6 +75,7 @@ CREATE TABLE public.group_info (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     group_name  text NOT NULL UNIQUE,
     website_url text,
+    tags        text[] NOT NULL DEFAULT '{}'::text[],
     created_at  timestamptz DEFAULT now(),
     updated_at  timestamptz DEFAULT now()
 );
@@ -82,6 +83,7 @@ CREATE TABLE public.group_info (
 COMMENT ON TABLE public.group_info IS '分组信息表';
 COMMENT ON COLUMN public.group_info.group_name IS '分组名称，关联 check_configs.group_name';
 COMMENT ON COLUMN public.group_info.website_url IS '网站地址';
+COMMENT ON COLUMN public.group_info.tags IS '分组标签，用于标记分组类型/用途';
 
 -- 系统通知表：存储全局系统通知
 CREATE TABLE public.system_notifications (

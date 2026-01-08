@@ -26,6 +26,7 @@ export interface GroupedProviderTimelines {
   displayName: string; // 显示名称（未分组为 "未分组"）
   timelines: ProviderTimeline[];
   websiteUrl?: string | null; // 网站地址
+  tags?: string[] | null; // 分组标签
 }
 
 /**

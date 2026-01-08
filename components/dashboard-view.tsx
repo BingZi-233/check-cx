@@ -338,6 +338,19 @@ function GroupPanel({
               <h2 className="truncate text-lg font-bold tracking-tight text-foreground sm:text-2xl">
                 {group.displayName}
               </h2>
+              {group.tags && group.tags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  {group.tags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className="rounded-full bg-background/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-sm backdrop-blur-sm"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
               {group.websiteUrl && (
                 <a
                   href={group.websiteUrl}
@@ -462,7 +475,7 @@ export function DashboardView({ initialData }: DashboardViewProps) {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            setOrderedGroupNames(prev => {
+            setOrderedGroupNames(() => {
               const currentSet = new Set(initialData.groupedTimelines.map(g => g.groupName));
               // Filter out saved names that no longer exist, and add new ones
               const validSaved = parsed.filter(name => currentSet.has(name));

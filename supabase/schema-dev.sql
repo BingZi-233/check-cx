@@ -58,6 +58,7 @@ CREATE TABLE dev.group_info (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     group_name text NOT NULL,
     website_url text,
+    tags text[] NOT NULL DEFAULT '{}'::text[],
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     CONSTRAINT group_info_pkey PRIMARY KEY (id),
@@ -154,6 +155,7 @@ COMMENT ON COLUMN dev.check_history.config_id IS '配置 UUID - 关联 check_con
 
 COMMENT ON COLUMN dev.group_info.group_name IS '分组名称 - 关联 check_configs.group_name';
 COMMENT ON COLUMN dev.group_info.website_url IS '网站地址';
+COMMENT ON COLUMN dev.group_info.tags IS '分组标签，用于标记分组类型/用途';
 
 COMMENT ON COLUMN dev.system_notifications.id IS '通知 UUID';
 COMMENT ON COLUMN dev.system_notifications.message IS '通知内容，支持 Markdown';

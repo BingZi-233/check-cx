@@ -26,6 +26,7 @@ export interface GroupDashboardData {
   pollIntervalMs: number;
   generatedAt: number;
   websiteUrl?: string | null;
+  tags?: string[] | null;
 }
 
 /**
@@ -116,9 +117,11 @@ export async function loadGroupDashboardData(
 
   // 获取分组信息（仅对有名分组）
   let websiteUrl: string | undefined | null;
+  let tags: string[] | undefined | null;
   if (!isTargetUngrouped) {
     const groupInfo = await getGroupInfo(targetGroupName);
     websiteUrl = groupInfo?.website_url;
+    tags = groupInfo?.tags ?? null;
   }
 
   return {
@@ -131,5 +134,6 @@ export async function loadGroupDashboardData(
     pollIntervalMs,
     generatedAt,
     websiteUrl,
+    tags,
   };
 }

@@ -41,6 +41,7 @@ export interface GroupInfoRow {
   id: string;
   group_name: string;
   website_url?: string | null;
+  tags?: string[] | null;
   created_at?: string;
   updated_at?: string;
 }

@@ -367,6 +367,19 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
             <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-6xl">
               {displayName}
             </h1>
+            {data.tags && data.tags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {data.tags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    className="rounded-full bg-background/50 px-2.5 py-1 text-xs font-semibold text-muted-foreground shadow-sm backdrop-blur-sm"
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
             {data.websiteUrl && (
               <a
                 href={data.websiteUrl}
