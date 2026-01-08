@@ -1,13 +1,14 @@
 "use client";
 
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {Activity, ExternalLink, Radio, RefreshCcw, Zap} from "lucide-react";
 
 import {ProviderIcon} from "@/components/provider-icon";
 import {StatusTimeline} from "@/components/status-timeline";
 import {Badge} from "@/components/ui/badge";
 import {HoverCard, HoverCardContent, HoverCardTrigger} from "@/components/ui/hover-card";
-import type {ProviderTimeline} from "@/lib/types";
+import type {HealthStatus, ProviderTimeline} from "@/lib/types";
 import type {GroupDashboardData} from "@/lib/core/group-data";
 import {OFFICIAL_STATUS_META, PROVIDER_LABEL, STATUS_META} from "@/lib/core/status";
 import {cn, formatLocalTime} from "@/lib/utils";
@@ -16,6 +17,52 @@ interface GroupDashboardViewProps {
   groupName: string;
   initialData: GroupDashboardData;
 }
+
+type StatusCounts = Record<HealthStatus, number>;
+
+const HEALTH_STATUSES = Object.keys(STATUS_META) as HealthStatus[];
+
+const makeEmptyStatusCounts = (): StatusCounts =>
+  Object.fromEntries(HEALTH_STATUSES.map((status) => [status, 0])) as StatusCounts;
+
+const isHealthStatus = (value: string | null): value is HealthStatus =>
+  !!value && Object.prototype.hasOwnProperty.call(STATUS_META, value);
+
+const STATUS_PILL_STYLES: Record<
+  HealthStatus,
+  { container: string; dot: string; active: string }
+> = {
+  operational: {
+    container: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    dot: "bg-emerald-500",
+    active: "ring-1 ring-emerald-500/40 bg-emerald-500/15",
+  },
+  degraded: {
+    container: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    dot: "bg-amber-500",
+    active: "ring-1 ring-amber-500/40 bg-amber-500/15",
+  },
+  failed: {
+    container: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+    dot: "bg-rose-500",
+    active: "ring-1 ring-rose-500/40 bg-rose-500/15",
+  },
+  validation_failed: {
+    container: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+    dot: "bg-orange-500",
+    active: "ring-1 ring-orange-500/40 bg-orange-500/15",
+  },
+  maintenance: {
+    container: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    dot: "bg-blue-500",
+    active: "ring-1 ring-blue-500/40 bg-blue-500/15",
+  },
+  error: {
+    container: "bg-red-600/10 text-red-700 dark:text-red-400",
+    dot: "bg-red-600",
+    active: "ring-1 ring-red-600/40 bg-red-600/15",
+  },
+};
 
 /** 计算所有 Provider 中最近一次检查的时间戳（毫秒） */
 const getLatestCheckTimestamp = (timelines: ProviderTimeline[]) => {
@@ -227,6 +274,9 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
   const [data, setData] = useState(initialData);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const lockRef = useRef(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [timeToNextRefresh, setTimeToNextRefresh] = useState<number | null>(() =>
     computeRemainingMs(
       initialData.pollIntervalMs,
@@ -325,25 +375,57 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
     [lastUpdated]
   );
 
-  // 根据卡片数量决定宽屏列数
-  const gridColsClass = useMemo(() => {
-    if (total > 4) {
-      return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
-    }
-    return "grid-cols-1 md:grid-cols-2";
-  }, [total]);
-
   // 计算状态统计
-  const statusSummary = useMemo(() => {
-    const counts = { operational: 0, degraded: 0, failed: 0, validation_failed: 0, maintenance: 0, error: 0 };
+  const statusSummary = useMemo<StatusCounts>(() => {
+    const counts = makeEmptyStatusCounts();
     for (const timeline of providerTimelines) {
-      const status = timeline.latest.status;
-      if (status in counts) {
-        counts[status as keyof typeof counts]++;
-      }
+      counts[timeline.latest.status]++;
     }
     return counts;
   }, [providerTimelines]);
+
+  const activeStatusFilter = useMemo(() => {
+    const value = searchParams.get("status");
+    return isHealthStatus(value) ? value : null;
+  }, [searchParams]);
+
+  const setStatusFilter = useCallback(
+    (next: HealthStatus | null) => {
+      const nextParams = new URLSearchParams(searchParams);
+      if (next) {
+        nextParams.set("status", next);
+      } else {
+        nextParams.delete("status");
+      }
+      const query = nextParams.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  const toggleStatusFilter = useCallback(
+    (status: HealthStatus) =>
+      setStatusFilter(activeStatusFilter === status ? null : status),
+    [activeStatusFilter, setStatusFilter]
+  );
+
+  const filteredProviderTimelines = useMemo(() => {
+    if (!activeStatusFilter) {
+      return providerTimelines;
+    }
+    return providerTimelines.filter(
+      (timeline) => timeline.latest.status === activeStatusFilter
+    );
+  }, [activeStatusFilter, providerTimelines]);
+
+  const filteredTotal = filteredProviderTimelines.length;
+
+  const gridColsClassForFiltered = useMemo(() => {
+    if (filteredTotal > 4) {
+      return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+    }
+    return "grid-cols-1 md:grid-cols-2";
+  }, [filteredTotal]);
 
   return (
     <div className="relative">
@@ -380,44 +462,48 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
           </div>
           
            <div className="flex flex-wrap items-center gap-2.5">
-            {statusSummary.operational > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
-                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                {statusSummary.operational} 正常
-              </span>
-            )}
-            {statusSummary.degraded > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                {statusSummary.degraded} 延迟
-              </span>
-            )}
-            {statusSummary.failed > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                {statusSummary.failed} 异常
-              </span>
-            )}
-            {statusSummary.validation_failed > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-2.5 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                {statusSummary.validation_failed} 验证失败
-              </span>
-            )}
-            {statusSummary.error > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/10 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
-                {statusSummary.error} 错误
-              </span>
-            )}
-             {statusSummary.maintenance > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-                {statusSummary.maintenance} 维护
-              </span>
+            <button
+              type="button"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors",
+                activeStatusFilter
+                  ? "bg-muted/40 text-muted-foreground hover:bg-muted/60"
+                  : "bg-foreground/10 text-foreground hover:bg-foreground/15"
+              )}
+              onClick={() => setStatusFilter(null)}
+              aria-pressed={!activeStatusFilter}
+              title="显示全部状态"
+            >
+              全部
+            </button>
+
+            {HEALTH_STATUSES.filter((status) => statusSummary[status] > 0).map(
+              (status) => {
+                const style = STATUS_PILL_STYLES[status];
+                const isActive = activeStatusFilter === status;
+                return (
+                  <button
+                    key={status}
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors hover:bg-muted/60",
+                      style.container,
+                      isActive && style.active
+                    )}
+                    onClick={() => toggleStatusFilter(status)}
+                    aria-pressed={isActive}
+                    title={STATUS_META[status].description}
+                  >
+                    <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} />
+                    {statusSummary[status]} {STATUS_META[status].label}
+                  </button>
+                );
+              }
             )}
             <span className="text-xs text-muted-foreground/60">|</span>
-            <span className="text-xs text-muted-foreground">{total} 个配置</span>
+            <span className="text-xs text-muted-foreground">
+              {activeStatusFilter ? `显示 ${filteredTotal}/${total} 个配置` : `${total} 个配置`}
+            </span>
           </div>
         </div>
 
@@ -451,9 +537,26 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
             </div>
             <h3 className="text-lg font-semibold">该分组下暂无配置</h3>
           </div>
+      ) : filteredTotal === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-border/50 bg-muted/20 py-16 text-center">
+          <div className="mb-3 rounded-full bg-muted/50 p-4">
+            <Activity className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold">没有匹配的状态</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            当前筛选：{STATUS_META[activeStatusFilter!].label}
+          </p>
+          <button
+            type="button"
+            className="mt-5 rounded-full border border-border/60 bg-background/60 px-4 py-1.5 text-sm font-medium text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-border/80 hover:text-foreground"
+            onClick={() => setStatusFilter(null)}
+          >
+            清除筛选
+          </button>
+        </div>
       ) : (
-        <section className={`grid gap-6 ${gridColsClass}`}>
-          {providerTimelines.map((timeline) => (
+        <section className={`grid gap-6 ${gridColsClassForFiltered}`}>
+          {filteredProviderTimelines.map((timeline) => (
             <ProviderCard
               key={timeline.id}
               timeline={timeline}
