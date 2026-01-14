@@ -149,6 +149,8 @@ Check CX 是一套基于 **Next.js 16** + **shadcn/ui** 构建的现代化 AI �
    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=your-anon-key
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
+   # 节点身份(多节点部署时标识实例)
+   CHECK_NODE_ID=local
    # 检测间隔(秒),范围 15-600,默认 60
    CHECK_POLL_INTERVAL_SECONDS=60
    # 历史数据保留天数,范围 7-365,默认 30
@@ -636,6 +638,7 @@ pnpm db:types         # 生成 Supabase 类型定义
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | - | Supabase 项目 URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` | ✅ | - | Supabase 公开密钥 |
 | `SUPABASE_SERVICE_ROLE_KEY` | ❌ | - | Supabase Service Role Key (服务端使用,绕过 RLS) |
+| `CHECK_NODE_ID` | ❌ | local | 节点身份(多节点部署时标识实例) |
 | `CHECK_POLL_INTERVAL_SECONDS` | ❌ | 60 | 检测间隔(秒),范围 15-600 |
 | `HISTORY_RETENTION_DAYS` | ❌ | 30 | 历史数据保留天数,范围 7-365 |
 | `CHECK_CONCURRENCY` | ❌ | 5 | 检测并发数,范围 1-20 |

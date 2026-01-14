@@ -9,6 +9,7 @@ import {runProviderChecks} from "../providers";
 import {getPollingIntervalMs} from "./polling-config";
 import {getLastPingStartedAt, getPollerTimer, setLastPingStartedAt, setPollerTimer,} from "./global-state";
 import {startOfficialStatusPoller} from "./official-status-poller";
+import {ensurePollerLeadership, isPollerLeader} from "./poller-leadership";
 import type {HealthStatus} from "../types";
 
 const POLL_INTERVAL_MS = getPollingIntervalMs();
@@ -17,6 +18,16 @@ const POLL_INTERVAL_MS = getPollingIntervalMs();
  * 执行一次轮询检查
  */
 async function tick() {
+  try {
+    await ensurePollerLeadership();
+  } catch (error) {
+    console.error("[check-cx] 主节点选举失败，跳过本轮轮询", error);
+    return;
+  }
+  if (!isPollerLeader()) {
+    console.log("[check-cx] 当前节点为 standby，跳过本轮轮询");
+    return;
+  }
   // 原子操作：检查并设置运行状态
   if (globalThis.__checkCxPollerRunning) {
     const lastStartedAt = getLastPingStartedAt();
@@ -114,6 +125,9 @@ if (!getPollerTimer()) {
   console.log(
     `[check-cx] 初始化后台轮询器，interval=${POLL_INTERVAL_MS}ms，首次检测预计 ${firstCheckAt}`
   );
+  ensurePollerLeadership().catch((error) => {
+    console.error("[check-cx] 初始化主节点选举失败", error);
+  });
   const timer = setInterval(() => {
     tick().catch((error) => console.error("[check-cx] 定时检测失败", error));
   }, POLL_INTERVAL_MS);

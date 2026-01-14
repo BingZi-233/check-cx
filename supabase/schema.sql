@@ -99,6 +99,20 @@ COMMENT ON COLUMN public.system_notifications.is_active IS '是否激活，true 
 COMMENT ON COLUMN public.system_notifications.level IS '通知级别：info, warning, error';
 COMMENT ON COLUMN public.system_notifications.created_at IS '创建时间';
 
+-- 轮询主节点租约表（单行租约）
+CREATE TABLE public.check_poller_leases (
+    lease_key text PRIMARY KEY,
+    leader_id text,
+    lease_expires_at timestamptz NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.check_poller_leases IS '轮询主节点租约表（单行租约）';
+
+INSERT INTO public.check_poller_leases (lease_key, leader_id, lease_expires_at)
+VALUES ('poller', NULL, to_timestamp(0))
+ON CONFLICT (lease_key) DO NOTHING;
+
 -- -----------------------------------------------------------------------------
 -- 3. 索引
 -- -----------------------------------------------------------------------------
@@ -184,6 +198,7 @@ ALTER TABLE public.check_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.check_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_info ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.check_poller_leases ENABLE ROW LEVEL SECURITY;
 
 -- check_history: 允许匿名用户读取
 CREATE POLICY allow_anon_select_history

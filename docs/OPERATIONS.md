@@ -17,6 +17,7 @@
 
 - `NEXT_PUBLIC_SUPABASE_URL`：Supabase 项目 URL
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY`：Supabase 浏览器可用的 Key
+- `CHECK_NODE_ID`（可选）：节点身份标识，多节点部署时用于标记主节点来源，默认 local
 - `CHECK_POLL_INTERVAL_SECONDS`（可选）：Provider 检查间隔，默认 60 秒，支持 15–600
 - `OFFICIAL_STATUS_CHECK_INTERVAL_SECONDS`（可选）：官方状态轮询间隔，默认 300 秒，支持 60–3600
 - `HISTORY_RETENTION_DAYS`（可选）：历史数据保留天数，默认 30 天，支持 7–365
@@ -30,6 +31,11 @@
 
 - Provider 的真实密钥仅存储在 Supabase 数据库表 `check_configs.api_key` 中。
 - 环境变量中只保存访问 Supabase 的 publishable/anon key，不直接暴露任何模型密钥。
+
+多节点部署说明：
+
+- 只有主节点会执行后台检测与官方状态轮询
+- 备节点只读取数据库并提供展示
 
 ## 3. 首次部署流程
 
@@ -69,6 +75,7 @@
 后台轮询器核心日志位于 `lib/core/poller.ts` 中，通过 `console.log` 输出。在部署平台中可搜索：
 
 - `[check-cx] 初始化后台轮询器，interval=...`
+- `[check-cx] 节点角色切换：standby -> leader ...`
 - `[check-cx] 后台 ping 开始 · ...`
 - `[check-cx] 本轮检测明细：`
 - `[check-cx] 历史记录更新完成：providers=...，总记录=...`

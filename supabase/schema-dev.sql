@@ -73,6 +73,20 @@ CREATE TABLE dev.system_notifications (
     created_at timestamptz DEFAULT now()
 );
 
+-- 轮询主节点租约表（单行租约）
+CREATE TABLE dev.check_poller_leases (
+    lease_key text PRIMARY KEY,
+    leader_id text,
+    lease_expires_at timestamptz NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE dev.check_poller_leases IS '轮询主节点租约表（单行租约）';
+
+INSERT INTO dev.check_poller_leases (lease_key, leader_id, lease_expires_at)
+VALUES ('poller', NULL, to_timestamp(0))
+ON CONFLICT (lease_key) DO NOTHING;
+
 -- Enable RLS on group_info
 ALTER TABLE dev.group_info ENABLE ROW LEVEL SECURITY;
 
@@ -86,6 +100,9 @@ ALTER TABLE dev.system_notifications ENABLE ROW LEVEL SECURITY;
 -- Create policy to allow read access for everyone on system_notifications
 CREATE POLICY "Allow public read access" ON dev.system_notifications
 FOR SELECT USING (true);
+
+-- Enable RLS on check_poller_leases (service role only)
+ALTER TABLE dev.check_poller_leases ENABLE ROW LEVEL SECURITY;
 
 -- 序列属主
 ALTER SEQUENCE dev.check_history_id_seq
@@ -168,6 +185,7 @@ COMMENT ON TABLE dev.check_configs IS 'AI 服务商配置表 - 存储各个 AI �
 COMMENT ON TABLE dev.check_history IS '健康检测历史记录表 - 存储每次 API 健康检测的结果';
 COMMENT ON TABLE dev.group_info IS '分组信息表 - 存储分组的额外信息';
 COMMENT ON TABLE dev.system_notifications IS '系统通知表 - 存储全局系统通知';
+COMMENT ON TABLE dev.check_poller_leases IS '轮询主节点租约表（单行租约）';
 
 COMMENT ON COLUMN dev.check_configs.id IS '配置 UUID - 自动生成的唯一标识符';
 COMMENT ON COLUMN dev.check_configs.name IS '配置显示名称 - 用于前端展示的友好名称';

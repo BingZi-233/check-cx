@@ -8,6 +8,7 @@ import {historySnapshotStore} from "../database/history";
 import {runProviderChecks} from "../providers";
 import {getPingCacheEntry} from "./global-state";
 import {getOfficialStatus} from "./official-status-poller";
+import {ensurePollerLeadership, isPollerLeader} from "./poller-leadership";
 
 export interface SnapshotScope {
   cacheKey: string;
@@ -36,6 +37,19 @@ export async function loadSnapshotForScope(
   const refreshHistory = async (): Promise<HistorySnapshot> => {
     if (scope.activeConfigs.length === 0) {
       return {};
+    }
+
+    try {
+      await ensurePollerLeadership();
+    } catch (error) {
+      console.error("[check-cx] 主节点选举失败，跳过主动刷新", error);
+      return readHistoryForScope(scope);
+    }
+    if (!isPollerLeader()) {
+      const snapshot = await readHistoryForScope(scope);
+      cacheEntry.history = snapshot;
+      cacheEntry.lastPingAt = Date.now();
+      return snapshot;
     }
 
     const now = Date.now();
