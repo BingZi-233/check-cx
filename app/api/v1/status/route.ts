@@ -148,8 +148,6 @@ export async function GET(request: NextRequest) {
   const allowedIds = new Set(activeConfigs.map((cfg) => cfg.id));
   const history = await loadHistory({ allowedIds });
 
-  const configMap = new Map(allConfigs.map((cfg) => [cfg.id, cfg]));
-
   const providers: ProviderStatus[] = [];
 
   for (const config of allConfigs) {

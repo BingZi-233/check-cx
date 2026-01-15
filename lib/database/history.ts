@@ -3,7 +3,7 @@
  */
 
 import "server-only";
-import type {PostgrestError, SupabaseClient} from "@supabase/supabase-js";
+import type {PostgrestError} from "@supabase/supabase-js";
 import {createAdminClient} from "../supabase/admin";
 import type {AvailabilityPeriod, CheckResult, HistorySnapshot, TrendDataMap, TrendDataPoint} from "../types";
 import {logError} from "../utils";
@@ -28,6 +28,8 @@ export const HISTORY_RETENTION_DAYS = (() => {
 const RPC_RECENT_HISTORY = "get_recent_check_history";
 const RPC_PRUNE_HISTORY = "prune_check_history";
 const RPC_HISTORY_BY_TIME = "get_check_history_by_time";
+
+type AdminClient = ReturnType<typeof createAdminClient>;
 
 export interface HistoryQueryOptions {
   allowedIds?: Iterable<string> | null;
@@ -107,7 +109,7 @@ class SnapshotStore {
   }
 
   private async pruneInternal(
-    supabase: SupabaseClient<any, string>,
+    supabase: AdminClient,
     retentionDays: number = HISTORY_RETENTION_DAYS
   ): Promise<void> {
     const { error } = await supabase.rpc(RPC_PRUNE_HISTORY, {
@@ -204,7 +206,7 @@ function isMissingFunctionError(error: PostgrestError | null): boolean {
 }
 
 async function fallbackFetchSnapshot(
-  supabase: SupabaseClient<any, string>,
+  supabase: AdminClient,
   allowedIds: string[] | null
 ): Promise<HistorySnapshot> {
   try {
@@ -286,7 +288,7 @@ async function fallbackFetchSnapshot(
 }
 
 async function fallbackPruneHistory(
-  supabase: SupabaseClient<any, string>,
+  supabase: AdminClient,
   retentionDays: number
 ): Promise<void> {
   try {
@@ -352,7 +354,7 @@ export async function loadHistoryTrendData(options: {
 }
 
 async function fallbackLoadTrendHistory(
-  supabase: SupabaseClient<any, string>,
+  supabase: AdminClient,
   allowedIds: string[] | null,
   sinceInterval: string
 ): Promise<TrendDataMap> {

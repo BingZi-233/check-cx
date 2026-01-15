@@ -9,11 +9,9 @@ import {
   ExternalLink,
   Github,
   GripVertical,
-  Radio,
   RefreshCcw,
   Search,
   X,
-  Zap,
 } from "lucide-react";
 import {
   DndContext,
@@ -316,7 +314,7 @@ export function DashboardView({ initialData }: DashboardViewProps) {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            setOrderedGroupNames(prev => {
+            setOrderedGroupNames(() => {
               const currentSet = new Set(initialData.groupedTimelines.map(g => g.groupName));
               // Filter out saved names that no longer exist, and add new ones
               const validSaved = parsed.filter(name => currentSet.has(name));
