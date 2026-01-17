@@ -72,6 +72,14 @@ const PERIOD_OPTIONS: Array<{ value: AvailabilityPeriod; label: string }> = [
   { value: "30d", label: "30 天" },
 ];
 
+type SortMode = "custom" | "group" | "name";
+
+const SORT_OPTIONS: Array<{ value: SortMode; label: string }> = [
+  { value: "custom", label: "自定义" },
+  { value: "group", label: "按分组" },
+  { value: "name", label: "按名称" },
+];
+
 // 未分组标识常量
 const UNGROUPED_KEY = "__ungrouped__";
 
@@ -285,6 +293,7 @@ export function DashboardView({ initialData }: DashboardViewProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<AvailabilityPeriod>(
     data.trendPeriod ?? "7d"
   );
+  const [sortMode, setSortMode] = useState<SortMode>("custom");
 
   // Initialize order with default data
   const [orderedGroupNames, setOrderedGroupNames] = useState<string[]>(() => 
@@ -314,6 +323,13 @@ export function DashboardView({ initialData }: DashboardViewProps) {
   useEffect(() => {
     // Client-side only: load from localStorage
     if (typeof window !== "undefined") {
+      // Load sort mode
+      const savedSortMode = localStorage.getItem("check-cx-sort-mode");
+      if (savedSortMode && ["custom", "group", "name"].includes(savedSortMode)) {
+        setSortMode(savedSortMode as SortMode);
+      }
+
+      // Load group order
       const saved = localStorage.getItem("check-cx-group-order");
       if (saved) {
         try {
@@ -335,6 +351,13 @@ export function DashboardView({ initialData }: DashboardViewProps) {
       }
     }
   }, [initialData.groupedTimelines]);
+
+  // Save sort mode to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("check-cx-sort-mode", sortMode);
+    }
+  }, [sortMode]);
 
   // Sync when data updates (e.g. polling adds/removes groups)
   useEffect(() => {
@@ -477,18 +500,57 @@ export function DashboardView({ initialData }: DashboardViewProps) {
     );
   }, [groupedTimelines]);
 
-  // Filter groups based on search query
+  // Filter and sort groups based on search query and sort mode
   const filteredGroupNames = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return orderedGroupNames;
+    let result = orderedGroupNames;
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter((groupName) => {
+        const group = groupedTimelines.find((g) => g.groupName === groupName);
+        if (!group) return false;
+        return group.displayName.toLowerCase().includes(query);
+      });
     }
-    const query = searchQuery.toLowerCase().trim();
-    return orderedGroupNames.filter((groupName) => {
-      const group = groupedTimelines.find((g) => g.groupName === groupName);
-      if (!group) return false;
-      return group.displayName.toLowerCase().includes(query);
+
+    // Sort based on sort mode
+    if (sortMode === "custom") {
+      // Keep the user's drag-and-drop order
+      return result;
+    }
+
+    result = [...result].sort((a, b) => {
+      const groupA = groupedTimelines.find((g) => g.groupName === a);
+      const groupB = groupedTimelines.find((g) => g.groupName === b);
+      if (!groupA || !groupB) return 0;
+
+      // Always put ungrouped at the end
+      if (a === UNGROUPED_KEY) return 1;
+      if (b === UNGROUPED_KEY) return -1;
+
+      if (sortMode === "group") {
+        // Sort by tags: compare tag by tag (first tag, then second, etc.)
+        const tagsA = groupA.tags?.split(",").map(t => t.trim().toLowerCase()) || [];
+        const tagsB = groupB.tags?.split(",").map(t => t.trim().toLowerCase()) || [];
+        const maxLen = Math.max(tagsA.length, tagsB.length);
+
+        for (let i = 0; i < maxLen; i++) {
+          const tagA = tagsA[i] || "";
+          const tagB = tagsB[i] || "";
+          const cmp = tagA.localeCompare(tagB);
+          if (cmp !== 0) return cmp;
+        }
+        // If all tags are equal, fall back to displayName
+        return groupA.displayName.toLowerCase().localeCompare(groupB.displayName.toLowerCase());
+      } else {
+        // Sort by displayName
+        return groupA.displayName.toLowerCase().localeCompare(groupB.displayName.toLowerCase());
+      }
     });
-  }, [orderedGroupNames, groupedTimelines, searchQuery]);
+
+    return result;
+  }, [orderedGroupNames, groupedTimelines, searchQuery, sortMode]);
 
   const groupedPanels = filteredGroupNames.length === 0 ? (
     <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-border/50 bg-muted/20 py-20 text-center">
@@ -603,6 +665,30 @@ export function DashboardView({ initialData }: DashboardViewProps) {
                    <X className="h-4 w-4" />
                  </button>
                )}
+             </div>
+           )}
+
+           {/* Sort Mode Selector */}
+           {hasMultipleGroups && (
+             <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+               <span className="pl-1">排序</span>
+               <div className="flex items-center gap-1 rounded-full bg-muted/30 p-0.5">
+                 {SORT_OPTIONS.map((option) => (
+                   <button
+                     key={option.value}
+                     type="button"
+                     onClick={() => setSortMode(option.value)}
+                     className={cn(
+                       "rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors",
+                       sortMode === option.value
+                         ? "bg-foreground text-background"
+                         : "text-muted-foreground hover:text-foreground"
+                     )}
+                   >
+                     {option.label}
+                   </button>
+                 ))}
+               </div>
              </div>
            )}
 
