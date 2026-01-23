@@ -5,8 +5,52 @@
 import type {AvailabilityPeriod} from "../types";
 import type {GroupDashboardData} from "./group-data";
 
-/** 缓存有效期默认值：2 分钟 */
-const DEFAULT_CACHE_TTL_MS = 2 * 60 * 1000;
+/** 缓存有效期默认值：5 分钟 */
+const DEFAULT_CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface GroupCacheMetrics {
+  hits: number;
+  misses: number;
+  staleHits: number;
+  forcedRefreshes: number;
+}
+
+const metrics: GroupCacheMetrics = {
+  hits: 0,
+  misses: 0,
+  staleHits: 0,
+  forcedRefreshes: 0,
+};
+
+const globalMetrics = globalThis as Record<string, unknown>;
+if (typeof window !== "undefined") {
+  globalMetrics.__CHECK_CX_GROUP_CACHE_METRICS__ = metrics;
+}
+
+function recordHit(isStale: boolean): void {
+  metrics.hits += 1;
+  if (isStale) {
+    metrics.staleHits += 1;
+  }
+}
+
+function recordMiss(isForced: boolean): void {
+  metrics.misses += 1;
+  if (isForced) {
+    metrics.forcedRefreshes += 1;
+  }
+}
+
+export function getGroupCacheMetrics(): GroupCacheMetrics {
+  return { ...metrics };
+}
+
+export function resetGroupCacheMetrics(): void {
+  metrics.hits = 0;
+  metrics.misses = 0;
+  metrics.staleHits = 0;
+  metrics.forcedRefreshes = 0;
+}
 
 interface CacheEntry {
   data: GroupDashboardData;
@@ -24,6 +68,10 @@ const pendingRequests = new Map<string, Promise<GroupDashboardData | null>>();
 
 function isExpired(entry: CacheEntry): boolean {
   return Date.now() - entry.timestamp >= entry.ttlMs;
+}
+
+function isFresh(entry: CacheEntry): boolean {
+  return !isExpired(entry);
 }
 
 export function getGroupCache(
@@ -64,6 +112,46 @@ function touchCache(groupName: string, trendPeriod: AvailabilityPeriod): void {
 
 export function clearGroupCache(): void {
   cache.clear();
+}
+
+export async function prefetchGroupData(
+  groupName: string,
+  periods: AvailabilityPeriod[],
+  currentPeriod?: AvailabilityPeriod
+): Promise<void> {
+  const targets = periods.filter((period) => period !== currentPeriod);
+  await Promise.all(
+    targets.map(async (trendPeriod) => {
+      const key = getCacheKey(groupName, trendPeriod);
+      const cached = cache.get(key);
+      if (cached && isFresh(cached)) {
+        return;
+      }
+      if (pendingRequests.has(key)) {
+        return;
+      }
+
+      const request = fetchFromNetwork(groupName, trendPeriod, cached?.etag)
+        .then(({ data, etag }) => {
+          if (data) {
+            setGroupCache(groupName, trendPeriod, data, etag);
+          } else if (cached) {
+            touchCache(groupName, trendPeriod);
+          }
+          return data;
+        })
+        .catch((error) => {
+          console.error("[check-cx] 预取分组数据失败", error);
+          return null;
+        })
+        .finally(() => {
+          pendingRequests.delete(key);
+        });
+
+      pendingRequests.set(key, request);
+      await request;
+    })
+  );
 }
 
 async function fetchFromNetwork(
@@ -160,6 +248,7 @@ export async function fetchGroupWithCache(
     revalidateIfFresh,
   } = options;
   const cached = getGroupCache(groupName, trendPeriod);
+  const key = getCacheKey(groupName, trendPeriod);
 
   if (forceFresh) {
     const { data, etag } = await fetchFromNetwork(
@@ -169,10 +258,12 @@ export async function fetchGroupWithCache(
       true
     );
     if (data) {
+      recordMiss(true);
       setGroupCache(groupName, trendPeriod, data, etag);
       return { data, fromCache: false, isRevalidating: false };
     }
     if (cached) {
+      recordHit(true);
       return { data: cached.data, fromCache: true, isRevalidating: false };
     }
     throw new Error("无数据可用");
@@ -186,18 +277,36 @@ export async function fetchGroupWithCache(
         cached.etag,
         onBackgroundUpdate
       );
+      recordHit(false);
       return { data: cached.data, fromCache: true, isRevalidating: true };
     }
+    recordHit(false);
     return { data: cached.data, fromCache: true, isRevalidating: false };
   }
 
   if (cached) {
     revalidateInBackground(groupName, trendPeriod, cached.etag, onBackgroundUpdate);
+    recordHit(true);
     return { data: cached.data, fromCache: true, isRevalidating: true };
+  }
+
+  const inflight = pendingRequests.get(key);
+  if (inflight) {
+    const data = await inflight;
+    const latestCache = getGroupCache(groupName, trendPeriod);
+    if (data) {
+      recordHit(false);
+      return { data, fromCache: true, isRevalidating: false };
+    }
+    if (latestCache) {
+      recordHit(true);
+      return { data: latestCache.data, fromCache: true, isRevalidating: false };
+    }
   }
 
   const { data, etag } = await fetchFromNetwork(groupName, trendPeriod);
   if (data) {
+    recordMiss(false);
     setGroupCache(groupName, trendPeriod, data, etag);
     return { data, fromCache: false, isRevalidating: false };
   }

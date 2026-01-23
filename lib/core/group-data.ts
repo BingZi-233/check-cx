@@ -8,12 +8,36 @@
 import {loadProviderConfigsFromDB} from "../database/config-loader";
 import {getGroupInfo} from "../database/group-info";
 import {getAvailabilityStats} from "../database/availability";
-import {loadHistoryTrendData} from "../database/history";
 import {getPollingIntervalLabel, getPollingIntervalMs} from "./polling-config";
 import {ensureOfficialStatusPoller} from "./official-status-poller";
 import {buildProviderTimelines, loadSnapshotForScope} from "./health-snapshot-service";
-import type {AvailabilityPeriod, AvailabilityStatsMap, ProviderTimeline, RefreshMode, TrendDataMap} from "../types";
+import type {AvailabilityPeriod, AvailabilityStatsMap, ProviderTimeline, RefreshMode} from "../types";
 import {UNGROUPED_DISPLAY_NAME, UNGROUPED_KEY} from "../types";
+
+interface GroupDashboardCacheEntry {
+  data?: GroupDashboardData | null;
+  expiresAt: number;
+  inflight?: Promise<GroupDashboardData | null>;
+}
+
+const DEFAULT_GROUP_CACHE_TTL_MS = 5 * 60 * 1000;
+const groupDashboardCache = new Map<string, GroupDashboardCacheEntry>();
+
+function getGroupCacheKey(
+  groupName: string,
+  pollIntervalMs: number,
+  providerKey: string,
+  trendPeriod: AvailabilityPeriod
+): string {
+  return `group:${groupName}:${pollIntervalMs}:${trendPeriod}:${providerKey}`;
+}
+
+function getGroupCacheTtlMs(pollIntervalMs: number): number {
+  if (Number.isFinite(pollIntervalMs) && pollIntervalMs > 0) {
+    return pollIntervalMs;
+  }
+  return DEFAULT_GROUP_CACHE_TTL_MS;
+}
 
 /**
  * 分组 Dashboard 数据结构
@@ -28,7 +52,6 @@ export interface GroupDashboardData {
   pollIntervalLabel: string;
   pollIntervalMs: number;
   availabilityStats: AvailabilityStatsMap;
-  trendData: TrendDataMap;
   trendPeriod: AvailabilityPeriod;
   generatedAt: number;
   websiteUrl?: string | null;
@@ -98,56 +121,100 @@ export async function loadGroupDashboardData(
   const cacheKey = `group:${targetGroupName}:${pollIntervalMs}:${providerKey}`;
   const refreshMode = options?.refreshMode ?? "missing";
   const trendPeriod = options?.trendPeriod ?? "7d";
-
-  const history = await loadSnapshotForScope(
-    {
-      cacheKey,
-      pollIntervalMs,
-      activeConfigs,
-      allowedIds,
-    },
-    refreshMode
+  const cacheKeyWithPeriod = getGroupCacheKey(
+    targetGroupName,
+    pollIntervalMs,
+    providerKey,
+    trendPeriod
   );
+  const cacheTtlMs = getGroupCacheTtlMs(pollIntervalMs);
+  const now = Date.now();
+  const shouldBypassCache = refreshMode === "always";
 
-  const providerTimelines = buildProviderTimelines(history, maintenanceConfigs);
-
-  const allEntries = providerTimelines
-    .flatMap((timeline) => timeline.items)
-    .sort(
-      (a, b) =>
-        new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime()
+  const loadData = async (): Promise<GroupDashboardData | null> => {
+    const history = await loadSnapshotForScope(
+      {
+        cacheKey,
+        pollIntervalMs,
+        activeConfigs,
+        allowedIds,
+      },
+      refreshMode
     );
 
-  const lastUpdated = allEntries.length ? allEntries[0].checkedAt : null;
-  const generatedAt = Date.now();
-  const configIds = groupConfigs.map((config) => config.id);
-  const [availabilityStats, trendData] = await Promise.all([
-    getAvailabilityStats(configIds),
-    loadHistoryTrendData({ period: trendPeriod, allowedIds: configIds }),
-  ]);
+    const providerTimelines = buildProviderTimelines(history, maintenanceConfigs);
 
-  // 获取分组信息（仅对有名分组）
-  let websiteUrl: string | undefined | null;
-  let tags = "";
-  if (!isTargetUngrouped) {
-    const groupInfo = await getGroupInfo(targetGroupName);
-    websiteUrl = groupInfo?.website_url;
-    tags = groupInfo?.tags ?? "";
+    let lastUpdated: string | null = null;
+    let lastUpdatedMs = 0;
+    for (const timeline of providerTimelines) {
+      const checkedAtMs = Date.parse(timeline.latest.checkedAt);
+      if (Number.isFinite(checkedAtMs) && checkedAtMs > lastUpdatedMs) {
+        lastUpdatedMs = checkedAtMs;
+        lastUpdated = timeline.latest.checkedAt;
+      }
+    }
+
+    const generatedAt = Date.now();
+    const configIds = groupConfigs.map((config) => config.id);
+    const availabilityStats = await getAvailabilityStats(configIds);
+
+    // 获取分组信息（仅对有名分组）
+    let websiteUrl: string | undefined | null;
+    let tags = "";
+    if (!isTargetUngrouped) {
+      const groupInfo = await getGroupInfo(targetGroupName);
+      websiteUrl = groupInfo?.website_url;
+      tags = groupInfo?.tags ?? "";
+    }
+
+    const data: GroupDashboardData = {
+      groupName: targetGroupName,
+      displayName: isTargetUngrouped ? UNGROUPED_DISPLAY_NAME : targetGroupName,
+      tags,
+      providerTimelines,
+      lastUpdated,
+      total: providerTimelines.length,
+      pollIntervalLabel,
+      pollIntervalMs,
+      availabilityStats,
+      trendPeriod,
+      generatedAt,
+      websiteUrl,
+    };
+
+    groupDashboardCache.set(cacheKeyWithPeriod, {
+      data,
+      expiresAt: Date.now() + cacheTtlMs,
+    });
+
+    return data;
+  };
+
+  if (!shouldBypassCache) {
+    const cached = groupDashboardCache.get(cacheKeyWithPeriod);
+    if (cached && now < cached.expiresAt) {
+      if (cached.data) {
+        cached.data.generatedAt = now;
+      }
+      return cached.data ?? null;
+    }
+    if (cached?.inflight) {
+      return cached.inflight;
+    }
+
+    const inflight = loadData().finally(() => {
+      const entry = groupDashboardCache.get(cacheKeyWithPeriod);
+      if (entry?.inflight === inflight) {
+        delete entry.inflight;
+      }
+    });
+    groupDashboardCache.set(cacheKeyWithPeriod, {
+      data: cached?.data,
+      expiresAt: cached?.expiresAt ?? 0,
+      inflight,
+    });
+    return inflight;
   }
 
-  return {
-    groupName: targetGroupName,
-    displayName: isTargetUngrouped ? UNGROUPED_DISPLAY_NAME : targetGroupName,
-    tags,
-    providerTimelines,
-    lastUpdated,
-    total: providerTimelines.length,
-    pollIntervalLabel,
-    pollIntervalMs,
-    availabilityStats,
-    trendData,
-    trendPeriod,
-    generatedAt,
-    websiteUrl,
-  };
+  return loadData();
 }

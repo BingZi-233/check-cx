@@ -15,13 +15,11 @@ export interface AvailabilityStat {
 
 export type AvailabilityStatsMap = Record<string, AvailabilityStat[]>;
 
-export interface TrendDataPoint {
-  timestamp: string;
-  latencyMs: number | null;
-  status: CheckResult["status"];
+export interface GroupInfoSummary {
+  groupName: string;
+  websiteUrl?: string | null;
+  tags: string;
 }
-
-export type TrendDataMap = Record<string, TrendDataPoint[]>;
 
 /**
  * 时间线项目（保持原始 ISO 时间，交给客户端格式化）
@@ -53,13 +51,12 @@ export interface GroupedProviderTimelines {
  */
 export interface DashboardData {
   providerTimelines: ProviderTimeline[];
-  groupedTimelines: GroupedProviderTimelines[]; // 分组后的数据
+  groupInfos: GroupInfoSummary[];
   lastUpdated: string | null;
   total: number;
   pollIntervalLabel: string;
   pollIntervalMs: number;
-  availabilityStats: AvailabilityStatsMap;
-  trendData: TrendDataMap;
+  availabilityStats?: AvailabilityStatsMap;
   trendPeriod: AvailabilityPeriod;
   /**
    * 服务端生成该数据的时间戳（ms）

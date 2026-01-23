@@ -15,13 +15,17 @@ export interface SnapshotScope {
   pollIntervalMs: number;
   activeConfigs: ProviderConfig[];
   allowedIds: Set<string>;
+  limitPerConfig?: number;
 }
 
 async function readHistoryForScope(scope: SnapshotScope): Promise<HistorySnapshot> {
   if (scope.allowedIds.size === 0) {
     return {};
   }
-  return historySnapshotStore.fetch({ allowedIds: scope.allowedIds });
+  return historySnapshotStore.fetch({
+    allowedIds: scope.allowedIds,
+    limitPerConfig: scope.limitPerConfig,
+  });
 }
 
 export async function loadSnapshotForScope(
@@ -33,6 +37,20 @@ export async function loadSnapshotForScope(
   }
 
   const cacheEntry = getPingCacheEntry(scope.cacheKey);
+  const now = Date.now();
+
+  if (refreshMode === "never") {
+    if (
+      cacheEntry.history &&
+      now - cacheEntry.lastPingAt < scope.pollIntervalMs
+    ) {
+      return cacheEntry.history;
+    }
+    const snapshot = await readHistoryForScope(scope);
+    cacheEntry.history = snapshot;
+    cacheEntry.lastPingAt = now;
+    return snapshot;
+  }
 
   const refreshHistory = async (): Promise<HistorySnapshot> => {
     if (scope.activeConfigs.length === 0) {
@@ -52,7 +70,6 @@ export async function loadSnapshotForScope(
       return snapshot;
     }
 
-    const now = Date.now();
     if (
       cacheEntry.history &&
       now - cacheEntry.lastPingAt < scope.pollIntervalMs
@@ -107,13 +124,11 @@ export function buildProviderTimelines(
       if (items.length === 0) {
         return null;
       }
-      const sorted = [...items].sort(
-        (a, b) => new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime()
-      );
-      const latest = attachOfficialStatus({ ...sorted[0] });
+      // historySnapshotStore 已按 checkedAt 倒序返回
+      const latest = attachOfficialStatus({ ...items[0] });
       return {
         id,
-        items: sorted,
+        items,
         latest,
       };
     })

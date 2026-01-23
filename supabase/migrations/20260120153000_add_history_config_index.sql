@@ -1,0 +1,8 @@
+-- =============================================================================
+-- 迁移：为历史查询添加组合索引 (public schema)
+--
+-- 目的：加速按 config_id + checked_at 的查询与窗口排序
+-- =============================================================================
+
+CREATE INDEX IF NOT EXISTS idx_history_config_id_checked_at
+ON public.check_history (config_id, checked_at DESC);

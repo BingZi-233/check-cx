@@ -9,70 +9,78 @@
 import {loadProviderConfigsFromDB} from "../database/config-loader";
 import {loadGroupInfos} from "../database/group-info";
 import {getAvailabilityStats} from "../database/availability";
-import {loadHistoryTrendData} from "../database/history";
 import {getPollingIntervalLabel, getPollingIntervalMs} from "./polling-config";
 import {ensureOfficialStatusPoller} from "./official-status-poller";
 import {buildProviderTimelines, loadSnapshotForScope} from "./health-snapshot-service";
-import type {AvailabilityPeriod, DashboardData, GroupedProviderTimelines, ProviderTimeline, RefreshMode,} from "../types";
-import type {GroupInfoRow} from "../types/database";
-import {UNGROUPED_DISPLAY_NAME, UNGROUPED_KEY} from "../types";
+import type {AvailabilityPeriod, DashboardData, GroupInfoSummary, RefreshMode,} from "../types";
 
-/**
- * 将 ProviderTimeline 列表按分组组织
- */
-function groupTimelines(timelines: ProviderTimeline[], groupInfos: GroupInfoRow[]): GroupedProviderTimelines[] {
-  // 按 groupName 分组
-  const groupMap = new Map<string, ProviderTimeline[]>();
-  
-  // 建立 groupInfo 映射
-  const groupInfoMap = new Map<string, GroupInfoRow>();
-  for (const info of groupInfos) {
-    groupInfoMap.set(info.group_name, info);
+interface DashboardCacheEntry {
+  data?: DashboardData;
+  etag?: string;
+  expiresAt: number;
+  inflight?: Promise<DashboardLoadResult>;
+}
+
+interface DashboardCacheMetrics {
+  hits: number;
+  misses: number;
+  inflightHits: number;
+}
+
+const dashboardCacheMetrics: DashboardCacheMetrics = {
+  hits: 0,
+  misses: 0,
+  inflightHits: 0,
+};
+
+export function getDashboardCacheMetrics(): DashboardCacheMetrics {
+  return { ...dashboardCacheMetrics };
+}
+
+export function resetDashboardCacheMetrics(): void {
+  dashboardCacheMetrics.hits = 0;
+  dashboardCacheMetrics.misses = 0;
+  dashboardCacheMetrics.inflightHits = 0;
+}
+
+const DEFAULT_DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+const SUMMARY_HISTORY_LIMIT = 1;
+const dashboardCache = new Map<string, DashboardCacheEntry>();
+
+function getDashboardCacheKey(
+  pollIntervalMs: number,
+  providerKey: string,
+  trendPeriod: AvailabilityPeriod,
+  includeDetails: boolean
+): string {
+  return `dashboard:${pollIntervalMs}:${trendPeriod}:${includeDetails ? "full" : "summary"}:${providerKey}`;
+}
+
+function getDashboardCacheTtlMs(pollIntervalMs: number): number {
+  if (Number.isFinite(pollIntervalMs) && pollIntervalMs > 0) {
+    return pollIntervalMs;
   }
+  return DEFAULT_DASHBOARD_CACHE_TTL_MS;
+}
 
-  for (const timeline of timelines) {
-    const groupKey = timeline.latest.groupName || UNGROUPED_KEY;
-    if (!groupMap.has(groupKey)) {
-      groupMap.set(groupKey, []);
-    }
-    groupMap.get(groupKey)!.push(timeline);
+function generateETag(data: string): string {
+  let hash = 5381;
+  for (let i = 0; i < data.length; i++) {
+    hash = ((hash << 5) + hash) ^ data.charCodeAt(i);
   }
+  return `"${(hash >>> 0).toString(16)}"`;
+}
 
-  // 转换为数组并排序
-  const groups: GroupedProviderTimelines[] = [];
+function buildDashboardEtag(data: DashboardData): string {
+  const { generatedAt, ...etagPayload } = data;
+  void generatedAt;
+  const jsonBody = JSON.stringify(etagPayload);
+  return generateETag(jsonBody);
+}
 
-  // 先处理有名称的分组（按分组名称字母序）
-  const namedGroups = [...groupMap.entries()]
-    .filter(([key]) => key !== UNGROUPED_KEY)
-    .sort(([a], [b]) => a.localeCompare(b));
-
-  for (const [groupName, groupTimelines] of namedGroups) {
-    const info = groupInfoMap.get(groupName);
-    groups.push({
-      groupName,
-      displayName: groupName,
-      websiteUrl: info?.website_url,
-      tags: info?.tags ?? "",
-      timelines: groupTimelines.sort((a, b) =>
-        a.latest.name.localeCompare(b.latest.name)
-      ),
-    });
-  }
-
-  // 最后处理未分组的（放在最后）
-  const ungrouped = groupMap.get(UNGROUPED_KEY);
-  if (ungrouped && ungrouped.length > 0) {
-    groups.push({
-      groupName: UNGROUPED_KEY,
-      displayName: UNGROUPED_DISPLAY_NAME,
-      tags: "",
-      timelines: ungrouped.sort((a, b) =>
-        a.latest.name.localeCompare(b.latest.name)
-      ),
-    });
-  }
-
-  return groups;
+export interface DashboardLoadResult {
+  data: DashboardData;
+  etag: string;
 }
 
 /**
@@ -86,7 +94,25 @@ function groupTimelines(timelines: ProviderTimeline[], groupInfos: GroupInfoRow[
 export async function loadDashboardData(options?: {
   refreshMode?: RefreshMode;
   trendPeriod?: AvailabilityPeriod;
+  includeDetails?: boolean;
 }): Promise<DashboardData> {
+  const result = await loadDashboardDataInternal(options);
+  return result.data;
+}
+
+export async function loadDashboardDataWithEtag(options?: {
+  refreshMode?: RefreshMode;
+  trendPeriod?: AvailabilityPeriod;
+  includeDetails?: boolean;
+}): Promise<DashboardLoadResult> {
+  return loadDashboardDataInternal(options);
+}
+
+async function loadDashboardDataInternal(options?: {
+  refreshMode?: RefreshMode;
+  trendPeriod?: AvailabilityPeriod;
+  includeDetails?: boolean;
+}): Promise<DashboardLoadResult> {
   ensureOfficialStatusPoller();
   const allConfigs = await loadProviderConfigsFromDB();
   const maintenanceConfigs = allConfigs.filter((cfg) => cfg.is_maintenance);
@@ -97,51 +123,114 @@ export async function loadDashboardData(options?: {
   const pollIntervalLabel = getPollingIntervalLabel();
   const providerKey =
     allowedIds.size > 0 ? [...allowedIds].sort().join("|") : "__empty__";
-  const cacheKey = `dashboard:${pollIntervalMs}:${providerKey}`;
   const refreshMode = options?.refreshMode ?? "missing";
   const trendPeriod = options?.trendPeriod ?? "7d";
-
-  const history = await loadSnapshotForScope(
-    {
-      cacheKey,
-      pollIntervalMs,
-      activeConfigs,
-      allowedIds,
-    },
-    refreshMode
+  const includeDetails = options?.includeDetails ?? false;
+  const cacheKey = `dashboard:${pollIntervalMs}:${providerKey}:${includeDetails ? "full" : "summary"}`;
+  const cacheKeyWithPeriod = getDashboardCacheKey(
+    pollIntervalMs,
+    providerKey,
+    trendPeriod,
+    includeDetails
   );
+  const cacheTtlMs = getDashboardCacheTtlMs(pollIntervalMs);
+  const now = Date.now();
+  const shouldBypassCache = refreshMode === "always";
 
-  const providerTimelines = buildProviderTimelines(history, maintenanceConfigs);
-
-  const allEntries = providerTimelines
-    .flatMap((timeline) => timeline.items)
-    .sort(
-      (a, b) =>
-        new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime()
+  const loadData = async (): Promise<DashboardLoadResult> => {
+    const history = await loadSnapshotForScope(
+      {
+        cacheKey,
+        pollIntervalMs,
+        activeConfigs,
+        allowedIds,
+        limitPerConfig: includeDetails ? undefined : SUMMARY_HISTORY_LIMIT,
+      },
+      refreshMode
     );
 
-  const lastUpdated = allEntries.length ? allEntries[0].checkedAt : null;
-  const generatedAt = Date.now();
+    const providerTimelines = buildProviderTimelines(history, maintenanceConfigs);
 
-  const groupInfos = await loadGroupInfos();
-  // 生成分组数据
-  const groupedTimelines = groupTimelines(providerTimelines, groupInfos);
-  const configIds = allConfigs.map((config) => config.id);
-  const [availabilityStats, trendData] = await Promise.all([
-    getAvailabilityStats(configIds),
-    loadHistoryTrendData({ period: trendPeriod, allowedIds: configIds }),
-  ]);
+    let lastUpdated: string | null = null;
+    let lastUpdatedMs = 0;
+    for (const timeline of providerTimelines) {
+      const checkedAtMs = Date.parse(timeline.latest.checkedAt);
+      if (Number.isFinite(checkedAtMs) && checkedAtMs > lastUpdatedMs) {
+        lastUpdatedMs = checkedAtMs;
+        lastUpdated = timeline.latest.checkedAt;
+      }
+    }
 
-  return {
-    providerTimelines,
-    groupedTimelines,
-    lastUpdated,
-    total: providerTimelines.length,
-    pollIntervalLabel,
-    pollIntervalMs,
-    availabilityStats,
-    trendData,
-    trendPeriod,
-    generatedAt,
+    const generatedAt = Date.now();
+    const groupInfos = await loadGroupInfos();
+    const groupInfoSummaries: GroupInfoSummary[] = groupInfos.map((info) => ({
+      groupName: info.group_name,
+      websiteUrl: info.website_url ?? null,
+      tags: info.tags ?? "",
+    }));
+    let availabilityStats;
+    if (includeDetails) {
+      const configIds = allConfigs.map((config) => config.id);
+      availabilityStats = await getAvailabilityStats(configIds);
+    }
+
+    const data: DashboardData = {
+      providerTimelines,
+      groupInfos: groupInfoSummaries,
+      lastUpdated,
+      total: providerTimelines.length,
+      pollIntervalLabel,
+      pollIntervalMs,
+      ...(includeDetails ? { availabilityStats } : {}),
+      trendPeriod,
+      generatedAt,
+    };
+
+    const etag = buildDashboardEtag(data);
+    dashboardCache.set(cacheKeyWithPeriod, {
+      data,
+      etag,
+      expiresAt: Date.now() + cacheTtlMs,
+    });
+
+    return { data, etag };
   };
+
+  if (!shouldBypassCache) {
+    const cached = dashboardCache.get(cacheKeyWithPeriod);
+    if (cached?.data && now < cached.expiresAt) {
+      dashboardCacheMetrics.hits += 1;
+      cached.data.generatedAt = now;
+      if (!cached.etag) {
+        cached.etag = buildDashboardEtag(cached.data);
+      }
+      return { data: cached.data, etag: cached.etag };
+    }
+    if (cached?.inflight) {
+      dashboardCacheMetrics.inflightHits += 1;
+      const result = await cached.inflight;
+      const entry = dashboardCache.get(cacheKeyWithPeriod);
+      if (entry && !entry.etag) {
+        entry.etag = result.etag;
+      }
+      return result;
+    }
+
+    dashboardCacheMetrics.misses += 1;
+    const inflight = loadData().finally(() => {
+      const entry = dashboardCache.get(cacheKeyWithPeriod);
+      if (entry?.inflight === inflight) {
+        delete entry.inflight;
+      }
+    });
+    dashboardCache.set(cacheKeyWithPeriod, {
+      data: cached?.data,
+      etag: cached?.etag,
+      expiresAt: cached?.expiresAt ?? 0,
+      inflight,
+    });
+    return inflight;
+  }
+
+  return loadData();
 }

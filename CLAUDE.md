@@ -176,7 +176,7 @@ lib/
    - 后端：`lib/core/health-snapshot-service.ts` 使用全局缓存，避免在轮询间隔内重复检测
    - 前端：`lib/utils/frontend-cache.ts` 实现 SWR 风格缓存，配合 ETag
 5. **前端轮询**: `components/dashboard-view.tsx` 使用客户端定时器定期调用 `/api/dashboard` 获取最新数据
-6. **数据聚合**: `lib/core/dashboard-data.ts` 和 `lib/core/group-data.ts` 负责分组、统计与趋势数据
+6. **数据聚合**: `lib/core/dashboard-data.ts` 和 `lib/core/group-data.ts` 负责分组与统计数据
 
 ### Supabase 集成
 
@@ -252,7 +252,6 @@ check_poller_leases (
 - **availability_stats**: 7/15/30 天可用性统计视图
 - **get_recent_check_history**: 获取最近的检查历史 RPC
 - **prune_check_history**: 清理历史记录的 RPC
-- **get_check_history_by_time**: 按时间范围获取历史记录
 
 ## 关键约定
 

@@ -298,45 +298,6 @@ BEGIN
 END;
 $$;
 
--- RPC: 按时间范围读取历史记录
-CREATE OR REPLACE FUNCTION dev.get_check_history_by_time(
-  since_interval interval DEFAULT '1 hour',
-  target_config_ids uuid[] DEFAULT NULL
-)
-RETURNS TABLE (
-  config_id uuid,
-  status text,
-  latency_ms integer,
-  ping_latency_ms integer,
-  checked_at timestamptz,
-  message text,
-  name text,
-  type text,
-  model text,
-  endpoint text,
-  group_name text
-)
-LANGUAGE sql
-STABLE
-AS $$
-  SELECT
-    h.config_id,
-    h.status,
-    h.latency_ms,
-    h.ping_latency_ms::integer,
-    h.checked_at,
-    h.message,
-    c.name,
-    c.type::text,
-    c.model,
-    c.endpoint,
-    c.group_name
-  FROM dev.check_history h
-  JOIN dev.check_configs c ON c.id = h.config_id
-  WHERE h.checked_at > NOW() - since_interval
-    AND (target_config_ids IS NULL OR h.config_id = ANY(target_config_ids))
-  ORDER BY c.name ASC, h.checked_at DESC;
-$$;
 
 -- ============================================
 -- 权限授予

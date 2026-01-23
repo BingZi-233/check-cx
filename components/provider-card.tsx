@@ -5,10 +5,9 @@ import {Radio, Zap} from "lucide-react";
 import {ProviderIcon} from "@/components/provider-icon";
 import {StatusTimeline} from "@/components/status-timeline";
 import {AvailabilityStats} from "@/components/availability-stats";
-import {HistoryTrendChart} from "@/components/history-trend-chart";
 import {Badge} from "@/components/ui/badge";
 import {HoverCard, HoverCardContent, HoverCardTrigger} from "@/components/ui/hover-card";
-import type {AvailabilityPeriod, AvailabilityStat, ProviderTimeline, TrendDataPoint} from "@/lib/types";
+import type {AvailabilityPeriod, AvailabilityStat, ProviderTimeline} from "@/lib/types";
 import {OFFICIAL_STATUS_META, PROVIDER_LABEL, STATUS_META} from "@/lib/core/status";
 import {ClientTime} from "@/components/client-time";
 import {cn} from "@/lib/utils";
@@ -20,7 +19,6 @@ interface ProviderCardProps {
   activeOfficialCardId: string | null;
   setActiveOfficialCardId: (id: string | null) => void;
   availabilityStats?: AvailabilityStat[] | null;
-  trendData?: TrendDataPoint[] | null;
   selectedPeriod: AvailabilityPeriod;
 }
 
@@ -48,7 +46,6 @@ export function ProviderCard({
   activeOfficialCardId,
   setActiveOfficialCardId,
   availabilityStats,
-  trendData,
   selectedPeriod,
 }: ProviderCardProps) {
   const { id, latest, items } = timeline;
@@ -193,9 +190,6 @@ export function ProviderCard({
       {/* Timeline Section - Visual separation */}
       <div className="border-t border-border/40 bg-muted/10 px-5 py-4">
         <StatusTimeline items={items} nextRefreshInMs={timeToNextRefresh} isMaintenance={isMaintenance} />
-        <div className="mt-4">
-          <HistoryTrendChart data={trendData} period={selectedPeriod} isMaintenance={isMaintenance} />
-        </div>
       </div>
     </div>
   );

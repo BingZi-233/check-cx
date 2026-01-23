@@ -6,7 +6,7 @@ import {Activity, ExternalLink, RefreshCcw} from "lucide-react";
 import {GroupTags} from "@/components/group-tags";
 import {ProviderCard} from "@/components/provider-card";
 import {ClientTime} from "@/components/client-time";
-import {fetchGroupWithCache, setGroupCache} from "@/lib/core/group-frontend-cache";
+import {fetchGroupWithCache, prefetchGroupData, setGroupCache} from "@/lib/core/group-frontend-cache";
 import type {AvailabilityPeriod, ProviderTimeline} from "@/lib/types";
 import type {GroupDashboardData} from "@/lib/core/group-data";
 import {cn} from "@/lib/utils";
@@ -121,6 +121,11 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
   }, [groupName, initialData]);
 
   useEffect(() => {
+    const currentPeriod = data.trendPeriod ?? "7d";
+    prefetchGroupData(groupName, ["7d", "15d", "30d"], currentPeriod).catch(() => undefined);
+  }, [data.trendPeriod, groupName]);
+
+  useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
@@ -179,7 +184,7 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
   }, [data.pollIntervalMs, latestCheckTimestamp]);
 
   const { providerTimelines, total, lastUpdated, pollIntervalLabel, displayName } = data;
-  const { availabilityStats, trendData } = data;
+  const { availabilityStats } = data;
 
   // 根据卡片数量决定宽屏列数
   const gridColsClass = useMemo(() => {
@@ -351,7 +356,6 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
               activeOfficialCardId={activeOfficialCardId}
               setActiveOfficialCardId={setActiveOfficialCardId}
               availabilityStats={availabilityStats[timeline.id]}
-              trendData={trendData[timeline.id]}
               selectedPeriod={selectedPeriod}
             />
           ))}

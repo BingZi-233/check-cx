@@ -33,7 +33,7 @@ check_configs → 轮询器 → check_history → 聚合快照 → API / 页面�
 - **Supabase**
   - 表：`check_configs`、`check_history`、`group_info`、`system_notifications`、`check_poller_leases`。
   - 视图：`availability_stats`（7/15/30 天可用性统计）。
-  - RPC：`get_recent_check_history`、`prune_check_history`、`get_check_history_by_time`。
+  - RPC：`get_recent_check_history`、`prune_check_history`。
 
 ## 3. 关键数据流
 
@@ -51,10 +51,10 @@ check_configs → 轮询器 → check_history → 聚合快照 → API / 页面�
 
 4. **快照与聚合**
    - `lib/core/health-snapshot-service.ts` 统一读取历史与触发刷新。
-   - `lib/core/dashboard-data.ts`/`group-data.ts` 负责分组、统计与趋势数据。
+   - `lib/core/dashboard-data.ts`/`group-data.ts` 负责统计数据；Dashboard 分组逻辑已前移到客户端。默认只返回最新时间线样本，`includeDetails=1` 返回完整历史。
 
 5. **对外输出**
-   - Dashboard 页面与 API 均使用聚合数据结构（时间线、可用性统计、趋势）。
+   - Dashboard 页面与 API 均使用聚合数据结构（时间线、可用性统计）。
 
 ## 4. 模块边界
 

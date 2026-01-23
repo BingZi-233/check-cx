@@ -5,7 +5,7 @@
 import "server-only";
 import type {PostgrestError} from "@supabase/supabase-js";
 import {createAdminClient} from "../supabase/admin";
-import type {AvailabilityPeriod, CheckResult, HistorySnapshot, TrendDataMap, TrendDataPoint} from "../types";
+import type {CheckResult, HistorySnapshot} from "../types";
 import {logError} from "../utils";
 
 /**
@@ -27,12 +27,12 @@ export const HISTORY_RETENTION_DAYS = (() => {
 
 const RPC_RECENT_HISTORY = "get_recent_check_history";
 const RPC_PRUNE_HISTORY = "prune_check_history";
-const RPC_HISTORY_BY_TIME = "get_check_history_by_time";
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
 export interface HistoryQueryOptions {
   allowedIds?: Iterable<string> | null;
+  limitPerConfig?: number;
 }
 
 interface RpcHistoryRow {
@@ -60,10 +60,11 @@ class SnapshotStore {
     }
 
     const supabase = createAdminClient();
+    const limitPerConfig = options?.limitPerConfig ?? MAX_POINTS_PER_PROVIDER;
     const { data, error } = await supabase.rpc(
       RPC_RECENT_HISTORY,
       {
-        limit_per_config: MAX_POINTS_PER_PROVIDER,
+        limit_per_config: limitPerConfig,
         target_config_ids: normalizedIds,
       }
     );
@@ -76,7 +77,7 @@ class SnapshotStore {
       return {};
     }
 
-    return mapRowsToSnapshot(data as RpcHistoryRow[] | null);
+    return mapRowsToSnapshot(data as RpcHistoryRow[] | null, limitPerConfig);
   }
 
   async append(results: CheckResult[]): Promise<void> {
@@ -156,7 +157,10 @@ function normalizeAllowedIds(
   return array.length > 0 ? array : [];
 }
 
-function mapRowsToSnapshot(rows: RpcHistoryRow[] | null): HistorySnapshot {
+function mapRowsToSnapshot(
+  rows: RpcHistoryRow[] | null,
+  limitPerConfig: number = MAX_POINTS_PER_PROVIDER
+): HistorySnapshot {
   if (!rows || rows.length === 0) {
     return {};
   }
@@ -188,7 +192,7 @@ function mapRowsToSnapshot(rows: RpcHistoryRow[] | null): HistorySnapshot {
       .sort(
         (a, b) => new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime()
       )
-      .slice(0, MAX_POINTS_PER_PROVIDER);
+      .slice(0, limitPerConfig);
   }
 
   return history;
@@ -200,8 +204,7 @@ function isMissingFunctionError(error: PostgrestError | null): boolean {
   }
   return (
     error.message.includes(RPC_RECENT_HISTORY) ||
-    error.message.includes(RPC_PRUNE_HISTORY) ||
-    error.message.includes(RPC_HISTORY_BY_TIME)
+    error.message.includes(RPC_PRUNE_HISTORY)
   );
 }
 
@@ -313,199 +316,3 @@ async function fallbackPruneHistory(
   }
 }
 
-interface RpcHistoryTrendRow {
-  config_id: string;
-  status: string;
-  latency_ms: number | null;
-  checked_at: string;
-}
-
-const PERIOD_INTERVALS: Record<string, string> = {
-  "7d": "7 days",
-  "15d": "15 days",
-  "30d": "30 days",
-};
-
-/**
- * 趋势数据缓存
- * - 趋势数据变化较慢，缓存 5 分钟以减少数据库压力
- * - 按 period 分开缓存
- */
-interface TrendDataCache {
-  data: TrendDataMap;
-  lastFetchedAt: number;
-}
-
-const TREND_CACHE_TTL_MS = 5 * 60 * 1000; // 5 分钟
-
-const trendDataCache: Record<string, TrendDataCache> = {};
-
-export async function loadHistoryTrendData(options: {
-  period: AvailabilityPeriod;
-  allowedIds?: Iterable<string> | null;
-}): Promise<TrendDataMap> {
-  const normalizedIds = normalizeAllowedIds(options.allowedIds);
-  if (Array.isArray(normalizedIds) && normalizedIds.length === 0) {
-    return {};
-  }
-
-  // 生成缓存键
-  const idsKey = normalizedIds ? normalizedIds.sort().join(",") : "__all__";
-  const cacheKey = `${options.period}:${idsKey}`;
-
-  // 检查缓存
-  const now = Date.now();
-  const cached = trendDataCache[cacheKey];
-  if (cached && now - cached.lastFetchedAt < TREND_CACHE_TTL_MS) {
-    return cached.data;
-  }
-
-  const supabase = createAdminClient();
-  const sinceInterval = PERIOD_INTERVALS[options.period] ?? "7 days";
-  const { data, error } = await supabase.rpc(RPC_HISTORY_BY_TIME, {
-    since_interval: sinceInterval,
-    target_config_ids: normalizedIds,
-  });
-
-  if (error) {
-    logError("读取趋势历史失败", error);
-    if (isMissingFunctionError(error)) {
-      const result = await fallbackLoadTrendHistory(supabase, normalizedIds, sinceInterval);
-      // 即使是 fallback 也缓存结果
-      trendDataCache[cacheKey] = { data: result, lastFetchedAt: now };
-      return result;
-    }
-    // 查询失败时返回旧缓存（如果有）
-    return cached?.data ?? {};
-  }
-
-  const result = mapTrendRows(data as RpcHistoryTrendRow[] | null);
-
-  // 更新缓存
-  trendDataCache[cacheKey] = { data: result, lastFetchedAt: now };
-
-  return result;
-}
-
-async function fallbackLoadTrendHistory(
-  supabase: AdminClient,
-  allowedIds: string[] | null,
-  sinceInterval: string
-): Promise<TrendDataMap> {
-  try {
-    const intervalDays = Number(sinceInterval.split(" ")[0]);
-    const cutoff = new Date(
-      Date.now() - intervalDays * 24 * 60 * 60 * 1000
-    ).toISOString();
-
-    let query = supabase
-      .from("check_history")
-      .select("config_id, status, latency_ms, checked_at")
-      .gt("checked_at", cutoff)
-      .order("checked_at", { ascending: true });
-
-    if (allowedIds) {
-      query = query.in("config_id", allowedIds);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      logError("fallback 模式下读取趋势失败", error);
-      return {};
-    }
-
-    return mapTrendRows(data as RpcHistoryTrendRow[] | null);
-  } catch (error) {
-    logError("fallback 模式下读取趋势异常", error);
-    return {};
-  }
-}
-
-function mapTrendRows(rows: RpcHistoryTrendRow[] | null): TrendDataMap {
-  if (!rows || rows.length === 0) {
-    return {};
-  }
-
-  const grouped: TrendDataMap = {};
-  for (const row of rows) {
-    if (!grouped[row.config_id]) {
-      grouped[row.config_id] = [];
-    }
-    grouped[row.config_id].push({
-      timestamp: row.checked_at,
-      latencyMs: row.latency_ms,
-      status: row.status as CheckResult["status"],
-    });
-  }
-
-  for (const key of Object.keys(grouped)) {
-    grouped[key] = grouped[key].sort(
-      (a, b) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    );
-    grouped[key] = sampleTrendData(grouped[key]);
-  }
-
-  return grouped;
-}
-
-function sampleTrendData(
-  points: TrendDataPoint[],
-  limit: number = 500
-) {
-  if (points.length <= limit) {
-    return points;
-  }
-
-  const indices = new Set<number>();
-  indices.add(0);
-  indices.add(points.length - 1);
-
-  let maxLatency = -Infinity;
-  let minLatency = Infinity;
-  let maxIndex = -1;
-  let minIndex = -1;
-
-  for (let i = 0; i < points.length; i += 1) {
-    const current = points[i];
-    if (i > 0 && current.status !== points[i - 1].status) {
-      indices.add(i);
-    }
-    if (typeof current.latencyMs === "number") {
-      if (current.latencyMs > maxLatency) {
-        maxLatency = current.latencyMs;
-        maxIndex = i;
-      }
-      if (current.latencyMs < minLatency) {
-        minLatency = current.latencyMs;
-        minIndex = i;
-      }
-    }
-  }
-
-  if (maxIndex >= 0) {
-    indices.add(maxIndex);
-  }
-  if (minIndex >= 0) {
-    indices.add(minIndex);
-  }
-
-  const targetCount = Math.min(limit, points.length);
-  const sortedIndices = Array.from(indices).sort((a, b) => a - b);
-
-  if (sortedIndices.length >= targetCount) {
-    const stride = Math.ceil(sortedIndices.length / targetCount);
-    return sortedIndices.filter((_, index) => index % stride === 0).map((idx) => points[idx]);
-  }
-
-  const remaining = targetCount - sortedIndices.length;
-  const stride = Math.max(1, Math.floor(points.length / remaining));
-  for (let i = 0; i < points.length && indices.size < targetCount; i += stride) {
-    indices.add(i);
-  }
-
-  return Array.from(indices)
-    .sort((a, b) => a - b)
-    .slice(0, targetCount)
-    .map((idx) => points[idx]);
-}

@@ -159,12 +159,9 @@ export async function GET(request: NextRequest) {
     }
 
     const items = history[config.id] || [];
-    const sortedItems = [...items].sort(
-      (a, b) => new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime()
-    );
 
-    const latest = sortedItems[0] || null;
-    const statistics = computeStatistics(sortedItems);
+    const latest = items[0] || null;
+    const statistics = computeStatistics(items);
 
     const isMaintenance = maintenanceConfigIds.has(config.id);
 
@@ -185,7 +182,7 @@ export async function GET(request: NextRequest) {
           }
         : null,
       statistics,
-      timeline: sortedItems.map((item) => ({
+      timeline: items.map((item) => ({
         status: isMaintenance ? "maintenance" : item.status,
         latencyMs: item.latencyMs,
         pingLatencyMs: item.pingLatencyMs,

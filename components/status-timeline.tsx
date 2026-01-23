@@ -79,6 +79,7 @@ export function StatusTimeline({ items, nextRefreshInMs, isMaintenance }: Status
   const segments = Array.from({ length: SEGMENT_LIMIT }, (_, index) =>
     items[index] ?? null
   );
+  const segmentCount = Math.min(items.length, SEGMENT_LIMIT);
   const nextRefreshLabel =
     typeof nextRefreshInMs === "number" ? formatRemainingTime(nextRefreshInMs) : null;
 
@@ -87,7 +88,7 @@ export function StatusTimeline({ items, nextRefreshInMs, isMaintenance }: Status
       {/* Header / Legend */}
       <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         <div className="flex items-center gap-2">
-          <span>History (60pts)</span>
+          <span>{segmentCount <= 1 ? "History (latest)" : `History (${segmentCount}pts)`}</span>
         </div>
         <div className="flex items-center gap-2">
            {nextRefreshLabel ? (
@@ -179,7 +180,7 @@ export function StatusTimeline({ items, nextRefreshInMs, isMaintenance }: Status
       
       {/* Axis labels */}
       <div className="flex justify-between text-[9px] font-medium uppercase tracking-widest text-muted-foreground/50">
-        <span>-60m</span>
+        <span>Past</span>
         <span>Now</span>
       </div>
     </div>

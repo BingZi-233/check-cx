@@ -44,7 +44,7 @@
 
 - 表：`check_configs`、`check_history`、`group_info`、`system_notifications`、`check_poller_leases`
 - 视图：`availability_stats`
-- RPC：`get_recent_check_history`、`prune_check_history`、`get_check_history_by_time`
+- RPC：`get_recent_check_history`、`prune_check_history`
 
 缺失 RPC 或视图会导致聚合回退到慢查询，应优先完成迁移。
 

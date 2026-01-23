@@ -15,10 +15,29 @@ interface AvailabilityCache {
   lastFetchedAt: number;
 }
 
+interface AvailabilityCacheMetrics {
+  hits: number;
+  misses: number;
+}
+
 const cache: AvailabilityCache = {
   data: {},
   lastFetchedAt: 0,
 };
+
+const metrics: AvailabilityCacheMetrics = {
+  hits: 0,
+  misses: 0,
+};
+
+export function getAvailabilityCacheMetrics(): AvailabilityCacheMetrics {
+  return { ...metrics };
+}
+
+export function resetAvailabilityCacheMetrics(): void {
+  metrics.hits = 0;
+  metrics.misses = 0;
+}
 
 function normalizeIds(ids?: Iterable<string> | null): string[] | null {
   if (!ids) {
@@ -82,8 +101,10 @@ export async function getAvailabilityStats(
   const ttl = getPollingIntervalMs();
   const now = Date.now();
   if (now - cache.lastFetchedAt < ttl && Object.keys(cache.data).length > 0) {
+    metrics.hits += 1;
     return filterStats(cache.data, normalizedIds);
   }
+  metrics.misses += 1;
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
