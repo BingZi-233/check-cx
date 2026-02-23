@@ -158,6 +158,7 @@ async function loadDashboardDataInternal(options?: {
     const groupInfoSummaries: GroupInfoSummary[] = groupInfos.map((info) => ({
       groupName: info.group_name,
       websiteUrl: info.website_url ?? null,
+      description: info.description ?? null,
       tags: info.tags ?? "",
     }));
     const configIds = allConfigs.map((config) => config.id);

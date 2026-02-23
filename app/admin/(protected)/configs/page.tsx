@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Pencil, Trash2, Plus, Settings, RefreshCw, Play, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Plus, Settings, RefreshCw, Play, Loader2, Copy } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { ProviderIcon } from "@/components/provider-icon";
 import { CrudDialog } from "@/components/admin/crud-dialog";
@@ -39,6 +39,7 @@ const TEST_STATUS_STYLES: Record<string, string> = {
 
 export default function ConfigsPage() {
   const [configs, setConfigs]         = useState<ConfigRow[]>([]);
+  const [groups, setGroups]           = useState<string[]>([]);
   const [page, setPage]               = useState(1);
   const [pageSize, setPageSize]       = useState(20);
   const [dialogOpen, setDialogOpen]   = useState(false);
@@ -53,6 +54,11 @@ export default function ConfigsPage() {
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/configs");
     if (res.ok) setConfigs(await res.json());
+    const gr = await fetch("/api/admin/groups");
+    if (gr.ok) {
+      const list: { group_name: string }[] = await gr.json();
+      setGroups(list.map((g) => g.group_name));
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -60,6 +66,23 @@ export default function ConfigsPage() {
   function openCreate() {
     setEditRow(null);
     setForm(defaultConfigForm());
+    setDialogOpen(true);
+  }
+
+  function openCopy(row: ConfigRow) {
+    setEditRow(null);
+    setForm({
+      name: row.name + " (副本)",
+      type: row.type,
+      model: row.model,
+      endpoint: row.endpoint,
+      api_key: "",
+      group_name: row.group_name ?? "",
+      request_header: row.request_header ? JSON.stringify(row.request_header, null, 2) : "",
+      metadata: row.metadata ? JSON.stringify(row.metadata, null, 2) : "",
+      enabled: row.enabled,
+      is_maintenance: row.is_maintenance,
+    });
     setDialogOpen(true);
   }
 
@@ -220,6 +243,9 @@ export default function ConfigsPage() {
                           <button onClick={() => openEdit(row)} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
+                          <button onClick={() => openCopy(row)} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="复制配置">
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
                           <button onClick={() => setDeleteId(row.id)} className="rounded p-1 text-muted-foreground hover:text-destructive hover:bg-muted transition-colors">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -250,7 +276,7 @@ export default function ConfigsPage() {
       />
 
       <CrudDialog open={dialogOpen} onOpenChange={setDialogOpen} title={editRow ? "编辑配置" : "新建配置"} onSubmit={handleSubmit} loading={loading}>
-        <ConfigForm data={form} onChange={setForm} isEdit={!!editRow} />
+        <ConfigForm data={form} onChange={setForm} isEdit={!!editRow} groups={groups} />
         {msg && <p className="text-sm text-destructive">{msg}</p>}
       </CrudDialog>
 

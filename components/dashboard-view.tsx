@@ -123,6 +123,7 @@ const buildGroupedTimelines = (
       groupName,
       displayName: groupName,
       websiteUrl: info?.websiteUrl,
+      description: info?.description,
       tags: info?.tags ?? "",
       timelines: [...groupTimelines].sort((a, b) =>
         a.latest.name.localeCompare(b.latest.name)
@@ -263,6 +264,9 @@ function GroupPanel({
                 </a>
               )}
             </div>
+            {group.description && (
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{group.description}</p>
+            )}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                {statusSummary.operational > 0 && (
                  <span className="flex items-center gap-1.5 whitespace-nowrap">

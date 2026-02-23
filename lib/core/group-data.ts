@@ -45,6 +45,7 @@ function getGroupCacheTtlMs(pollIntervalMs: number): number {
 export interface GroupDashboardData {
   groupName: string;
   displayName: string;
+  description?: string | null;
   tags: string;
   providerTimelines: ProviderTimeline[];
   lastUpdated: string | null;
@@ -160,16 +161,19 @@ export async function loadGroupDashboardData(
 
     // 获取分组信息（仅对有名分组）
     let websiteUrl: string | undefined | null;
+    let description: string | undefined | null;
     let tags = "";
     if (!isTargetUngrouped) {
       const groupInfo = await getGroupInfo(targetGroupName);
       websiteUrl = groupInfo?.website_url;
+      description = groupInfo?.description;
       tags = groupInfo?.tags ?? "";
     }
 
     const data: GroupDashboardData = {
       groupName: targetGroupName,
       displayName: isTargetUngrouped ? UNGROUPED_DISPLAY_NAME : targetGroupName,
+      description,
       tags,
       providerTimelines,
       lastUpdated,

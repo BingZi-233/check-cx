@@ -240,6 +240,9 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
               </a>
             )}
           </div>
+          {data.description && (
+            <p className="max-w-2xl text-base text-muted-foreground">{data.description}</p>
+          )}
           
            <div className="flex flex-wrap items-center gap-2.5">
             {statusSummary.operational > 0 && (

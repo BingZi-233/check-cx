@@ -23,9 +23,10 @@ interface ConfigFormProps {
   data: ConfigFormData;
   onChange: (data: ConfigFormData) => void;
   isEdit?: boolean;
+  groups?: string[];
 }
 
-export function ConfigForm({ data, onChange, isEdit }: ConfigFormProps) {
+export function ConfigForm({ data, onChange, isEdit, groups }: ConfigFormProps) {
   const set = (key: keyof ConfigFormData, value: string | boolean) =>
     onChange({ ...data, [key]: value });
 
@@ -63,8 +64,20 @@ export function ConfigForm({ data, onChange, isEdit }: ConfigFormProps) {
         <Input id="cfg-apikey" type="password" value={data.api_key} onChange={(e) => set("api_key", e.target.value)} placeholder={isEdit ? "留空不修改" : "sk-..."} required={!isEdit} />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="cfg-group">分组</Label>
-        <Input id="cfg-group" value={data.group_name} onChange={(e) => set("group_name", e.target.value)} placeholder="生产环境" />
+        <Label>分组</Label>
+        {groups && groups.length > 0 ? (
+          <Select value={data.group_name || "__none__"} onValueChange={(v) => set("group_name", v === "__none__" ? "" : v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="无分组" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">无分组</SelectItem>
+              {groups.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input id="cfg-group" value={data.group_name} onChange={(e) => set("group_name", e.target.value)} placeholder="生产环境" />
+        )}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="cfg-headers">自定义请求头 (JSON)</Label>
