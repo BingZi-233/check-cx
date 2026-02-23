@@ -336,6 +336,63 @@ export async function check新Provider(
 }
 ```
 
+## 管理后台
+
+项目内置一套基于 Supabase Auth 的 Web 管理后台，访问入口为 `/admin`，覆盖监控配置、分组、通知的完整 CRUD 与统计概览。
+
+### 认证
+
+使用 Supabase Auth 邮箱密码登录。`middleware.ts` 保护所有 `/admin/*`（`/admin/login` 除外）和 `/api/admin/*` 路由，未认证请求重定向至 `/admin/login`。
+
+**创建初始管理员账号**（在 Supabase Dashboard → SQL Editor 执行）：
+
+```sql
+SELECT auth.create_user(
+  uid                := gen_random_uuid(),
+  email              := 'admin@example.com',
+  password           := 'your-password-here',
+  email_confirmed_at := now()
+);
+```
+
+### 路由结构
+
+```
+app/admin/
+├── (protected)/                    # 受保护路由组（继承认证 layout）
+│   ├── layout.tsx                  # 认证检查 + AdminSidebar 布局
+│   ├── page.tsx                    # /admin — 统计概览（Server Component）
+│   ├── configs/page.tsx            # /admin/configs — 配置管理
+│   ├── groups/page.tsx             # /admin/groups — 分组管理
+│   └── notifications/page.tsx     # /admin/notifications — 通知管理
+└── login/page.tsx                  # /admin/login — 登录页（不继承 layout）
+```
+
+> 关键：`(protected)` 是 Next.js 路由组，不影响 URL 路径，仅用于隔离 layout 继承关系。登录页不在此组内，避免 layout 中的 auth 检查造成重定向循环。
+
+### 管理 API
+
+所有 `/api/admin/*` 路由使用 `createAdminClient()`（service role）操作数据库，并通过 `createClient().auth.getClaims()` 验证 session：
+
+| 路由 | 方法 | 说明 |
+|------|------|------|
+| `/api/admin/configs` | GET / POST | 配置列表（api_key 脱敏）/ 新增 |
+| `/api/admin/configs/[id]` | PUT / PATCH / DELETE | 全量更新 / 字段切换 / 删除 |
+| `/api/admin/groups` | GET / POST | 分组列表 / 新增 |
+| `/api/admin/groups/[groupName]` | PUT / DELETE | 更新 / 删除 |
+| `/api/admin/notifications` | GET / POST | 通知列表 / 新增 |
+| `/api/admin/notifications/[id]` | PUT / PATCH / DELETE | 更新 / 激活切换 / 删除 |
+| `/api/admin/stats` | GET | 统计概览数据聚合 |
+| `/api/admin/auth/signout` | POST | 登出 |
+
+### API Key 安全策略
+
+- GET 返回脱敏值：`••••` + 末 4 位
+- PUT 更新时若 `api_key` 为空字符串则跳过该字段，不覆盖原值
+- 明文 key 仅在 POST 创建时写入数据库
+
+---
+
 ## 修改配置
 
 不要通过环境变量管理 CHECK 配置,请使用 SQL 命令在 Supabase 中操作:

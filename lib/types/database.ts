@@ -67,3 +67,35 @@ export interface SystemNotificationRow {
   level: "info" | "warning" | "error";
   created_at: string;
 }
+
+export interface AlertChannelRow {
+  id: string;
+  name: string;
+  type: "webhook" | "feishu" | "dingtalk";
+  config: Record<string, unknown>;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface AlertRuleRow {
+  id: string;
+  name: string;
+  condition_type: "status_change" | "consecutive_failures" | "latency_threshold";
+  condition_params: Record<string, unknown>;
+  channel_ids: string[];
+  config_ids: string[] | null;
+  enabled: boolean;
+  cooldown_seconds: number;
+  created_at: string;
+}
+
+export interface AlertHistoryRow {
+  id: string;
+  rule_id: string;
+  channel_id: string;
+  config_id: string;
+  status: "sent" | "failed" | "skipped";
+  payload: Record<string, unknown> | null;
+  error_message: string | null;
+  triggered_at: string;
+}

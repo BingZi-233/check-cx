@@ -10,6 +10,7 @@ import {getPollingIntervalMs} from "./polling-config";
 import {getLastPingStartedAt, getPollerTimer, setLastPingStartedAt, setPollerTimer,} from "./global-state";
 import {startOfficialStatusPoller} from "./official-status-poller";
 import {ensurePollerLeadership, isPollerLeader} from "./poller-leadership";
+import {evaluateAlerts} from "./alert-engine";
 import type {HealthStatus} from "../types";
 
 const POLL_INTERVAL_MS = getPollingIntervalMs();
@@ -88,6 +89,11 @@ async function tick() {
     const providerCount = new Set(results.map((item) => item.id)).size;
     console.log(
       `[check-cx] 历史记录更新完成：providers=${providerCount}，本轮新增=${results.length}`
+    );
+
+    // 告警评估
+    await Promise.allSettled(
+      results.map((r) => evaluateAlerts(r.id, r.name, r.status, r.latencyMs ?? null))
     );
 
     const statusCounts: Record<HealthStatus, number> = {

@@ -4,7 +4,7 @@
  */
 
 // 数据库类型
-export type { CheckConfigRow, CheckHistoryRow } from "./database";
+export type { CheckConfigRow, CheckHistoryRow, AlertChannelRow, AlertRuleRow, AlertHistoryRow } from "./database";
 
 // Provider 类型
 export type { ProviderType, ProviderConfig } from "./provider";
