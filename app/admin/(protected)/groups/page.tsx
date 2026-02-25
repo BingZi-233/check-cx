@@ -145,29 +145,25 @@ export default function GroupsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">分组管理</h1>
-        <div className="flex items-center gap-2">
-          <button onClick={load} className="flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-            <RefreshCw className="h-3.5 w-3.5" />
-            刷新
-          </button>
-          <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90">
-            <Plus className="h-4 w-4" />
-            新建分组
-          </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="flex-1 text-xl font-semibold">分组管理</h1>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="搜索标识、名称、描述…"
+            className="h-8 w-44 rounded-md border border-input bg-background pl-8 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          />
         </div>
-      </div>
-
-      {/* 搜索栏 */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="搜索标识、显示名称、描述…"
-          className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        />
+        <button onClick={load} className="flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <RefreshCw className="h-3.5 w-3.5" />
+          刷新
+        </button>
+        <button onClick={openCreate} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90">
+          <Plus className="h-4 w-4" />
+          新建分组
+        </button>
       </div>
 
       {/* 批量操作栏 */}

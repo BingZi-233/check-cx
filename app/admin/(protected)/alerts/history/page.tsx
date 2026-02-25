@@ -100,8 +100,8 @@ export default function AlertHistoryPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-1 items-center gap-2">
           <h1 className="text-xl font-semibold">告警历史</h1>
           {total > 0 && (
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
@@ -109,30 +109,26 @@ export default function AlertHistoryPage() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-            自动刷新
-          </span>
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
-            <option value="">全部状态</option>
-            <option value="sent">已发送</option>
-            <option value="failed">失败</option>
-            <option value="skipped">冷却中</option>
-          </select>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索规则、渠道、配置…"
+            className="h-8 w-48 rounded-md border border-input bg-background pl-8 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          />
         </div>
-      </div>
-
-      {/* 搜索栏 */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜索规则、渠道、配置、错误信息…"
-          className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        />
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+          自动刷新
+        </span>
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          className="h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
+          <option value="">全部状态</option>
+          <option value="sent">已发送</option>
+          <option value="failed">失败</option>
+          <option value="skipped">冷却中</option>
+        </select>
       </div>
 
       {/* 批量操作栏 */}
