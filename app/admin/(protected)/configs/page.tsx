@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Pencil, Trash2, Plus, Settings, RefreshCw, Play, Loader2, Copy, PlayCircle } from "lucide-react";
+import { Pencil, Trash2, Plus, Settings, RefreshCw, Play, Loader2, Copy, PlayCircle, Search } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { ProviderIcon } from "@/components/provider-icon";
 import { CrudDialog } from "@/components/admin/crud-dialog";
@@ -38,19 +38,21 @@ const TEST_STATUS_STYLES: Record<string, string> = {
 };
 
 export default function ConfigsPage() {
-  const [configs, setConfigs]         = useState<ConfigRow[]>([]);
-  const [groups, setGroups]           = useState<string[]>([]);
-  const [page, setPage]               = useState(1);
-  const [pageSize, setPageSize]       = useState(20);
-  const [dialogOpen, setDialogOpen]   = useState(false);
-  const [deleteId, setDeleteId]       = useState<string | null>(null);
-  const [editRow, setEditRow]         = useState<ConfigRow | null>(null);
-  const [form, setForm]               = useState<ConfigFormData>(defaultConfigForm());
-  const [loading, setLoading]         = useState(false);
-  const [msg, setMsg]                 = useState("");
-  const [testLoading, setTestLoading] = useState<Record<string, boolean>>({});
-  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
-  const [selected, setSelected]       = useState<Set<string>>(new Set());
+  const [configs, setConfigs]           = useState<ConfigRow[]>([]);
+  const [groups, setGroups]             = useState<string[]>([]);
+  const [search, setSearch]             = useState("");
+  const [page, setPage]                 = useState(1);
+  const [pageSize, setPageSize]         = useState(20);
+  const [dialogOpen, setDialogOpen]     = useState(false);
+  const [deleteId, setDeleteId]         = useState<string | null>(null);
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [editRow, setEditRow]           = useState<ConfigRow | null>(null);
+  const [form, setForm]                 = useState<ConfigFormData>(defaultConfigForm());
+  const [loading, setLoading]           = useState(false);
+  const [msg, setMsg]                   = useState("");
+  const [testLoading, setTestLoading]   = useState<Record<string, boolean>>({});
+  const [testResults, setTestResults]   = useState<Record<string, TestResult>>({});
+  const [selected, setSelected]         = useState<Set<string>>(new Set());
   const [batchRunning, setBatchRunning] = useState(false);
 
   const load = useCallback(async () => {
@@ -64,6 +66,16 @@ export default function ConfigsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const filtered = search.trim()
+    ? configs.filter((r) => {
+        const q = search.toLowerCase();
+        return r.name.toLowerCase().includes(q)
+          || r.model.toLowerCase().includes(q)
+          || r.endpoint.toLowerCase().includes(q)
+          || (r.group_name ?? "").toLowerCase().includes(q);
+      })
+    : configs;
 
   function openCreate() {
     setEditRow(null);
@@ -112,7 +124,6 @@ export default function ConfigsPage() {
     }
     setLoading(true);
     setMsg("");
-
     let reqHeader: unknown = null;
     let meta: unknown = null;
     try {
@@ -123,7 +134,6 @@ export default function ConfigsPage() {
       setLoading(false);
       return;
     }
-
     const body = { ...form, request_header: reqHeader, metadata: meta };
     const url = editRow ? `/api/admin/configs/${editRow.id}` : "/api/admin/configs";
     const method = editRow ? "PUT" : "POST";
@@ -136,6 +146,13 @@ export default function ConfigsPage() {
   async function handleDelete(id: string) {
     await fetch(`/api/admin/configs/${id}`, { method: "DELETE" });
     setDeleteId(null);
+    load();
+  }
+
+  async function handleBatchDelete() {
+    await Promise.all([...selected].map((id) => fetch(`/api/admin/configs/${id}`, { method: "DELETE" })));
+    setSelected(new Set());
+    setBatchDeleteOpen(false);
     load();
   }
 
@@ -170,7 +187,7 @@ export default function ConfigsPage() {
     setBatchRunning(false);
   }
 
-  const pageRows = configs.slice((page - 1) * pageSize, page * pageSize);
+  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
   const pageIds = pageRows.map((r) => r.id);
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
   const somePageSelected = pageIds.some((id) => selected.has(id));
@@ -203,15 +220,23 @@ export default function ConfigsPage() {
         </div>
       </div>
 
+      {/* 搜索栏 */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          placeholder="搜索名称、模型、端点、分组…"
+          className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+      </div>
+
       {/* 批量操作栏 */}
       {selected.size > 0 && (
         <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
           <span className="text-sm font-medium">已选 {selected.size} 条</span>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSelected(new Set())}
-              className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors"
-            >
+            <button onClick={() => setSelected(new Set())} className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors">
               取消选择
             </button>
             <button
@@ -219,11 +244,15 @@ export default function ConfigsPage() {
               disabled={batchRunning}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-all"
             >
-              {batchRunning
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <PlayCircle className="h-3.5 w-3.5" />
-              }
+              {batchRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="h-3.5 w-3.5" />}
               批量检测
+            </button>
+            <button
+              onClick={() => setBatchDeleteOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-all"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              批量删除
             </button>
           </div>
         </div>
@@ -262,12 +291,7 @@ export default function ConfigsPage() {
                 return (
                   <tr key={row.id} className={`group hover:bg-muted/30 transition-colors ${isSelected ? "bg-primary/5" : ""}`}>
                     <td className="w-10 px-3 py-2.5">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(row.id)}
-                        className="h-3.5 w-3.5 cursor-pointer accent-primary"
-                      />
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(row.id)} className="h-3.5 w-3.5 cursor-pointer accent-primary" />
                     </td>
                     <td className="px-3 py-2.5 font-medium">{row.name}</td>
                     <td className="px-3 py-2.5">
@@ -298,12 +322,7 @@ export default function ConfigsPage() {
                           </span>
                         )}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => runTest(row.id)}
-                            disabled={tl}
-                            className="rounded p-1 text-muted-foreground hover:text-primary hover:bg-muted transition-colors disabled:opacity-50"
-                            title="即时测试"
-                          >
+                          <button onClick={() => runTest(row.id)} disabled={tl} className="rounded p-1 text-muted-foreground hover:text-primary hover:bg-muted transition-colors disabled:opacity-50" title="即时测试">
                             {tl ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                           </button>
                           <button onClick={() => openEdit(row)} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -324,11 +343,11 @@ export default function ConfigsPage() {
             </tbody>
           </table>
         </div>
-        {configs.length === 0 && (
+        {filtered.length === 0 && (
           <div className="py-16 text-center">
             <Settings className="mx-auto h-8 w-8 text-muted-foreground/30" />
-            <p className="mt-3 text-sm font-medium">暂无配置</p>
-            <p className="mt-1 text-xs text-muted-foreground">点击右上角「新建配置」添加第一条监控项</p>
+            <p className="mt-3 text-sm font-medium">{search ? "未找到匹配的配置" : "暂无配置"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{search ? "尝试修改搜索关键词" : "点击右上角「新建配置」添加第一条监控项"}</p>
           </div>
         )}
       </div>
@@ -336,7 +355,7 @@ export default function ConfigsPage() {
       <Pagination
         page={page}
         pageSize={pageSize}
-        total={configs.length}
+        total={filtered.length}
         onPageChange={setPage}
         onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
       />
@@ -349,6 +368,11 @@ export default function ConfigsPage() {
       <CrudDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)} title="确认删除" onSubmit={() => deleteId && handleDelete(deleteId)}>
         <p className="text-sm text-muted-foreground">此操作不可撤销，确认删除该配置？</p>
       </CrudDialog>
+
+      <CrudDialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen} title="确认批量删除" onSubmit={handleBatchDelete}>
+        <p className="text-sm text-muted-foreground">将删除已选 <strong>{selected.size}</strong> 条配置，此操作不可撤销。</p>
+      </CrudDialog>
     </div>
   );
 }
+

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   let query = createAdminClient()
     .from("alert_history")
     .select(`
-      id, rule_id, channel_id, config_id, status, error_message, triggered_at,
+      id, rule_id, channel_id, config_id, status, error_message, triggered_at, payload,
       alert_rules(name),
       alert_channels(name, type),
       check_configs(name)
@@ -37,4 +37,15 @@ export async function GET(request: NextRequest) {
   const { data, error, count } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data: data ?? [], total: count ?? 0, page, pageSize });
+}
+
+export async function DELETE(request: NextRequest) {
+  const err = await requireAuth();
+  if (err) return err;
+  const { ids } = await request.json() as { ids: string[] };
+  if (!Array.isArray(ids) || ids.length === 0)
+    return NextResponse.json({ error: "ids required" }, { status: 400 });
+  const { error } = await createAdminClient().from("alert_history").delete().in("id", ids);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }
