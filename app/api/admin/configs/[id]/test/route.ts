@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth } from "../../../alerts/_auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runProviderChecks } from "@/lib/providers";
+import { appendHistory } from "@/lib/database/history";
 import type { ProviderConfig, ProviderType } from "@/lib/types";
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +34,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   };
 
   const [result] = await runProviderChecks([config]);
+
+  // 写入历史记录
+  await appendHistory([result]);
+
   return NextResponse.json({
     status: result.status,
     latencyMs: result.latencyMs,
