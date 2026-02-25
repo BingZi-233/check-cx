@@ -7,7 +7,8 @@ CREATE SCHEMA IF NOT EXISTS dev;
 CREATE TYPE dev.provider_type AS ENUM (
     'openai',
     'gemini',
-    'anthropic'
+    'anthropic',
+    'grok'
 );
 
 -- 自增序列

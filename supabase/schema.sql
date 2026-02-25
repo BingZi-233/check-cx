@@ -7,7 +7,7 @@
 -- 1. 枚举类型
 -- -----------------------------------------------------------------------------
 
-CREATE TYPE public.provider_type AS ENUM ('openai', 'gemini', 'anthropic');
+CREATE TYPE public.provider_type AS ENUM ('openai', 'gemini', 'anthropic', 'grok');
 
 -- -----------------------------------------------------------------------------
 -- 2. 表结构
