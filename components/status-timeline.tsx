@@ -126,7 +126,12 @@ export function StatusTimeline({ items, nextRefreshInMs, isMaintenance }: Status
                 open={isOpen}
                 openDelay={isCoarsePointer ? 0 : 100}
                 onOpenChange={(nextOpen) =>
-                  setActiveSegmentKey(nextOpen ? segmentKey : null)
+                  setActiveSegmentKey((current) => {
+                    if (nextOpen) {
+                      return segmentKey;
+                    }
+                    return current === segmentKey ? null : current;
+                  })
                 }
               >
                 <HoverCardTrigger asChild>
