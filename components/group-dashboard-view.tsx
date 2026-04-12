@@ -1,54 +1,58 @@
 "use client";
 
-import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Activity, ExternalLink, RefreshCcw} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ExternalLink, RefreshCcw } from "lucide-react";
 
-import {GroupTags} from "@/components/group-tags";
-import {ProviderCard} from "@/components/provider-card";
-import {ClientTime} from "@/components/client-time";
-import {CornerPlus} from "@/components/ui/corner-plus";
-import {PillToggle} from "@/components/ui/pill-toggle";
-import {Button} from "@/components/ui/button";
-import {fetchGroupWithCache, prefetchGroupData, setGroupCache} from "@/lib/core/group-frontend-cache";
-import type {AvailabilityPeriod, ProviderTimeline} from "@/lib/types";
-import type {GroupDashboardData} from "@/lib/core/group-data";
-import {cn} from "@/lib/utils";
+import { NotificationBanner } from "@/components/notification-banner";
+import { GroupTags } from "@/components/group-tags";
+import { ProviderCard } from "@/components/provider-card";
+import { Topbar } from "@/components/topbar";
+import { ClientTime } from "@/components/client-time";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+import { fetchGroupWithCache, prefetchGroupData, setGroupCache } from "@/lib/core/group-frontend-cache";
+import type { AvailabilityPeriod, ProviderTimeline } from "@/lib/types";
+import type { GroupDashboardData } from "@/lib/core/group-data";
+import { cn } from "@/lib/utils";
 
 interface GroupDashboardViewProps {
   groupName: string;
   initialData: GroupDashboardData;
 }
 
-const getLatestCheckTimestamp = (timelines: ProviderTimeline[]) => {
-  const timestamps = timelines.map((timeline) =>
-    new Date(timeline.latest.checkedAt).getTime()
-  );
-  return timestamps.length > 0 ? Math.max(...timestamps) : null;
-};
-
-const computeRemainingMs = (
-  pollIntervalMs: number | null | undefined,
-  latestCheckTimestamp: number | null,
-  clock: number = Date.now()
-) => {
-  if (!pollIntervalMs || pollIntervalMs <= 0 || latestCheckTimestamp === null) {
-    return null;
-  }
-  const remaining = pollIntervalMs - (clock - latestCheckTimestamp);
-  return Math.max(0, remaining);
-};
-
 const PERIOD_OPTIONS: Array<{ value: AvailabilityPeriod; label: string }> = [
-  { value: "7d", label: "7 天" },
-  { value: "15d", label: "15 天" },
-  { value: "30d", label: "30 天" },
+  { value: "7d",  label: "7d" },
+  { value: "15d", label: "15d" },
+  { value: "30d", label: "30d" },
 ];
 
-/**
- * 分组 Dashboard 视图
- * - 展示单个分组内的所有 Provider 卡片
- * - 支持客户端定时刷新
- */
+const STATUS_BADGE_MAP = [
+  { key: "operational" as const,       variant: "success"   as const, label: "ok" },
+  { key: "degraded" as const,          variant: "warning"   as const, label: "slow" },
+  { key: "failed" as const,            variant: "danger"    as const, label: "down" },
+  { key: "validation_failed" as const, variant: "warning"   as const, label: "invalid" },
+  { key: "error" as const,             variant: "danger"    as const, label: "error" },
+  { key: "maintenance" as const,       variant: "secondary" as const, label: "maint" },
+];
+
+function getLatestTs(timelines: ProviderTimeline[]) {
+  const ts = timelines.map((t) => new Date(t.latest.checkedAt).getTime());
+  return ts.length ? Math.max(...ts) : null;
+}
+
+function computeRemaining(
+  ms: number | null | undefined,
+  latestTs: number | null,
+  clock = Date.now()
+) {
+  if (!ms || ms <= 0 || latestTs === null) return null;
+  return Math.max(0, ms - (clock - latestTs));
+}
+
 export function GroupDashboardView({ groupName, initialData }: GroupDashboardViewProps) {
   const [data, setData] = useState(initialData);
   const [selectedPeriod, setSelectedPeriod] = useState<AvailabilityPeriod>(
@@ -56,255 +60,232 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const lockRef = useRef(false);
+
+  const latestTs = useMemo(
+    () => getLatestTs(data.providerTimelines),
+    [data.providerTimelines]
+  );
   const [timeToNextRefresh, setTimeToNextRefresh] = useState<number | null>(() =>
-    computeRemainingMs(
+    computeRemaining(
       initialData.pollIntervalMs,
-      getLatestCheckTimestamp(initialData.providerTimelines),
+      getLatestTs(initialData.providerTimelines),
       initialData.generatedAt
     )
   );
-  const latestCheckTimestamp = useMemo(
-    () => getLatestCheckTimestamp(data.providerTimelines),
-    [data.providerTimelines]
-  );
 
   const refresh = useCallback(
-    async (
-      period?: AvailabilityPeriod,
-      forceFresh?: boolean,
-      revalidateIfFresh?: boolean
-    ) => {
-    if (lockRef.current) {
-      return;
-    }
-    lockRef.current = true;
-    setIsRefreshing(true);
-    try {
-      const targetPeriod = period ?? selectedPeriod;
-      const result = await fetchGroupWithCache({
-        groupName,
-        trendPeriod: targetPeriod,
-        forceFresh,
-        revalidateIfFresh,
-        onBackgroundUpdate: (newData) => {
-          setData(newData);
-        },
-      });
-      setData(result.data);
-    } catch (error) {
-      console.error("[check-cx] 分组自动刷新失败", error);
-    } finally {
-      setIsRefreshing(false);
-      lockRef.current = false;
-    }
-  }, [groupName, selectedPeriod]);
+    async (period?: AvailabilityPeriod, force?: boolean, revalidate?: boolean) => {
+      if (lockRef.current) return;
+      lockRef.current = true;
+      setIsRefreshing(true);
+      try {
+        const result = await fetchGroupWithCache({
+          groupName,
+          trendPeriod: period ?? selectedPeriod,
+          forceFresh: force,
+          revalidateIfFresh: revalidate,
+          onBackgroundUpdate: setData,
+        });
+        setData(result.data);
+      } catch (e) {
+        console.error("[check-cx] group refresh failed", e);
+      } finally {
+        setIsRefreshing(false);
+        lockRef.current = false;
+      }
+    },
+    [groupName, selectedPeriod]
+  );
 
   useEffect(() => {
     setData(initialData);
-    if (initialData.trendPeriod) {
+    if (initialData.trendPeriod)
       setGroupCache(groupName, initialData.trendPeriod, initialData);
-    }
   }, [groupName, initialData]);
 
   useEffect(() => {
-    const currentPeriod = data.trendPeriod ?? "7d";
-    prefetchGroupData(groupName, ["7d", "15d", "30d"], currentPeriod).catch(() => undefined);
+    prefetchGroupData(
+      groupName,
+      ["7d", "15d", "30d"],
+      data.trendPeriod ?? "7d"
+    ).catch(() => {});
   }, [data.trendPeriod, groupName]);
 
   useEffect(() => {
-    if (!data.pollIntervalMs || data.pollIntervalMs <= 0) {
-      return;
-    }
-    const timer = window.setInterval(() => {
-      refresh(undefined, false, true).catch(() => undefined);
-    }, data.pollIntervalMs);
-    return () => window.clearInterval(timer);
+    if (!data.pollIntervalMs || data.pollIntervalMs <= 0) return;
+    const t = window.setInterval(
+      () => refresh(undefined, false, true).catch(() => {}),
+      data.pollIntervalMs
+    );
+    return () => window.clearInterval(t);
   }, [data.pollIntervalMs, refresh]);
 
   useEffect(() => {
-    if (selectedPeriod === data.trendPeriod) {
-      return;
-    }
-    refresh(selectedPeriod).catch(() => undefined);
+    if (selectedPeriod !== data.trendPeriod) refresh(selectedPeriod).catch(() => {});
   }, [data.trendPeriod, refresh, selectedPeriod]);
 
   useEffect(() => {
-    if (!data.pollIntervalMs || data.pollIntervalMs <= 0 || latestCheckTimestamp === null) {
+    if (!data.pollIntervalMs || !latestTs) {
       setTimeToNextRefresh(null);
       return;
     }
+    const tick = () =>
+      setTimeToNextRefresh(computeRemaining(data.pollIntervalMs, latestTs));
+    tick();
+    const t = window.setInterval(tick, 1000);
+    return () => window.clearInterval(t);
+  }, [data.pollIntervalMs, latestTs]);
 
-    const updateCountdown = () => {
-      setTimeToNextRefresh(
-        computeRemainingMs(data.pollIntervalMs, latestCheckTimestamp)
-      );
+  const {
+    providerTimelines,
+    total,
+    lastUpdated,
+    pollIntervalLabel,
+    displayName,
+    availabilityStats,
+  } = data;
+
+  const gridCols = useMemo(
+    () =>
+      total > 4
+        ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
+        : "grid-cols-1 sm:grid-cols-2",
+    [total]
+  );
+
+  const statusCounts = useMemo(() => {
+    const c = {
+      operational: 0, degraded: 0, failed: 0,
+      validation_failed: 0, maintenance: 0, error: 0,
     };
-
-    updateCountdown();
-    const countdownTimer = window.setInterval(updateCountdown, 1000);
-    return () => window.clearInterval(countdownTimer);
-  }, [data.pollIntervalMs, latestCheckTimestamp]);
-
-  const { providerTimelines, total, lastUpdated, pollIntervalLabel, displayName } = data;
-  const { availabilityStats } = data;
-
-  const gridColsClass = useMemo(() => {
-    if (total > 4) {
-      return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+    for (const t of providerTimelines) {
+      const s = t.latest.status;
+      if (s in c) c[s as keyof typeof c]++;
     }
-    return "grid-cols-1 md:grid-cols-2";
-  }, [total]);
-
-  const statusSummary = useMemo(() => {
-    const counts = { operational: 0, degraded: 0, failed: 0, validation_failed: 0, maintenance: 0, error: 0 };
-    for (const timeline of providerTimelines) {
-      const status = timeline.latest.status;
-      if (status in counts) {
-        counts[status as keyof typeof counts]++;
-      }
-    }
-    return counts;
+    return c;
   }, [providerTimelines]);
 
+  // Topbar controls
+  const topbarControls = (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <ToggleGroup
+          type="single"
+          value={selectedPeriod}
+          onValueChange={(v) => v && setSelectedPeriod(v as AvailabilityPeriod)}
+          size="sm"
+          className="rounded-md border border-border/60 bg-background"
+        >
+          {PERIOD_OPTIONS.map((o) => (
+            <ToggleGroupItem
+              key={o.value}
+              value={o.value}
+              className="h-8 rounded-[calc(var(--radius)-2px)] px-2.5 text-xs data-[state=on]:bg-foreground data-[state=on]:text-background"
+            >
+              {o.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </TooltipTrigger>
+      <TooltipContent>Availability window</TooltipContent>
+    </Tooltip>
+  );
+
   return (
-    <div className="relative">
-      <CornerPlus className="fixed left-4 top-4 h-6 w-6 text-border md:left-8 md:top-8" />
-      <CornerPlus className="fixed right-4 top-4 h-6 w-6 text-border md:right-8 md:top-8" />
-      <CornerPlus className="fixed bottom-4 left-4 h-6 w-6 text-border md:bottom-8 md:left-8" />
-      <CornerPlus className="fixed bottom-4 right-4 h-6 w-6 text-border md:bottom-8 md:right-8" />
+    <>
+      <NotificationBanner />
+      <Topbar controls={topbarControls} />
 
-      <header className="relative z-10 mb-8 flex flex-col justify-between gap-6 sm:mb-12 sm:gap-8 lg:flex-row lg:items-end">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background sm:h-8 sm:w-8">
-              <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+        {/* Page header */}
+        <div className="flex flex-col gap-2 border-b pb-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">{displayName}</h1>
+              <GroupTags tags={data.tags} />
+              {data.websiteUrl && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={data.websiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent>Official status page</TooltipContent>
+                </Tooltip>
+              )}
             </div>
-            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground sm:text-sm">
-              Group View
-            </span>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-6xl">
-              {displayName}
-            </h1>
-            <GroupTags tags={data.tags} />
-            {data.websiteUrl && (
-              <a
-                href={data.websiteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center rounded-full bg-muted/50 p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <ExternalLink className="h-6 w-6" />
-              </a>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            {statusSummary.operational > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-operational)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-operational)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-operational)]" />
-                {statusSummary.operational} 正常
-              </span>
-            )}
-            {statusSummary.degraded > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-degraded)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-degraded)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-degraded)]" />
-                {statusSummary.degraded} 延迟
-              </span>
-            )}
-            {statusSummary.failed > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-failed)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-failed)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-failed)]" />
-                {statusSummary.failed} 异常
-              </span>
-            )}
-            {statusSummary.validation_failed > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-validation)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-validation)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-validation)]" />
-                {statusSummary.validation_failed} 验证失败
-              </span>
-            )}
-            {statusSummary.error > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-error)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-error)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-error)]" />
-                {statusSummary.error} 错误
-              </span>
-            )}
-            {statusSummary.maintenance > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-maintenance)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-maintenance)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-maintenance)]" />
-                {statusSummary.maintenance} 维护
-              </span>
-            )}
-            <span className="text-xs text-muted-foreground/60">|</span>
-            <span className="text-xs text-muted-foreground">{total} 个配置</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-start gap-4 lg:items-end">
-          <PillToggle
-            label="可用性区间"
-            options={PERIOD_OPTIONS}
-            value={selectedPeriod}
-            onChange={setSelectedPeriod}
-          />
-
-          <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-4 py-1.5 backdrop-blur-sm">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--status-operational)] opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--status-operational)]" />
-            </span>
-            <span className="text-xs font-semibold uppercase tracking-wider">Operational</span>
+            {/* Status summary */}
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {STATUS_BADGE_MAP.map(({ key, variant, label }) => {
+                const n = statusCounts[key];
+                if (!n) return null;
+                return (
+                  <Badge key={key} variant={variant} className="rounded font-normal">
+                    {n} {label}
+                  </Badge>
+                );
+              })}
+              <span className="text-xs text-muted-foreground/40">·</span>
+              <span className="text-xs text-muted-foreground">{total} total</span>
+            </div>
           </div>
 
           {lastUpdated && (
-            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <RefreshCcw className={cn("h-3 w-3", isRefreshing && "animate-spin")} />
-                <span>更新于 <ClientTime value={lastUpdated} /></span>
-              </div>
-              <span className="opacity-30">|</span>
-              <span>{pollIntervalLabel} 轮询</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => refresh(selectedPeriod, true)}
-                  disabled={isRefreshing}
-                  className={cn(
-                    "h-auto rounded-full border-border/60 px-3 py-1 text-2xs font-semibold uppercase tracking-wider",
-                    isRefreshing && "cursor-not-allowed opacity-60"
-                  )}
-                >
-                  刷新
-                </Button>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <RefreshCcw
+                    className={cn(
+                      "h-3.5 w-3.5 cursor-default",
+                      isRefreshing && "animate-spin"
+                    )}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Polling every {pollIntervalLabel}</TooltipContent>
+              </Tooltip>
+              <span>
+                Updated <ClientTime value={lastUpdated} />
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refresh(selectedPeriod, true)}
+                disabled={isRefreshing}
+                className="h-7 rounded-md px-2.5 text-xs"
+              >
+                Refresh
+              </Button>
             </div>
           )}
         </div>
-      </header>
 
-      {total === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/50 bg-muted/20 py-20 text-center">
-          <div className="mb-4 rounded-full bg-muted/50 p-4">
-            <Activity className="h-8 w-8 text-muted-foreground" />
+        {/* Grid */}
+        {total === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-20 text-center">
+            <p className="text-sm font-medium text-muted-foreground">
+              No services in this group.
+            </p>
           </div>
-          <h3 className="text-lg font-semibold">该分组下暂无配置</h3>
-        </div>
-      ) : (
-        <section className={`grid gap-6 ${gridColsClass}`}>
-          {providerTimelines.map((timeline) => (
-            <ProviderCard
-              key={timeline.id}
-              timeline={timeline}
-              timeToNextRefresh={timeToNextRefresh}
-              availabilityStats={availabilityStats[timeline.id]}
-              selectedPeriod={selectedPeriod}
-            />
-          ))}
-        </section>
-      )}
-    </div>
+        ) : (
+          <div className={cn("grid gap-4", gridCols)}>
+            {providerTimelines.map((t) => (
+              <ProviderCard
+                key={t.id}
+                timeline={t}
+                timeToNextRefresh={timeToNextRefresh}
+                availabilityStats={availabilityStats[t.id]}
+                selectedPeriod={selectedPeriod}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

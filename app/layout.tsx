@@ -1,10 +1,11 @@
-import type {Metadata} from "next";
-import {Geist, Geist_Mono} from "next/font/google";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "@/lib/core/poller";
 import NextTopLoader from "nextjs-toploader";
-import {ThemeProvider} from "@/components/theme-provider";
-import {NotificationBanner} from "@/components/notification-banner";
+import { ThemeProvider } from "@/components/theme-provider";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import ThemeClock from "@/components/theme-clock";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LINUX DO - 模型中转状态检测",
-  description: "实时检测 OpenAI / Gemini / Anthropic 对话接口的可用性与延迟",
+  title: "Check CX — AI Model Status",
+  description: "Real-time availability and latency monitoring for OpenAI, Gemini, and Anthropic APIs.",
   icons: {
     icon: "/favicon.png",
   },
@@ -45,9 +46,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: themeBootScript }}
         />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <NextTopLoader color="var(--foreground)" showSpinner={false} />
         <ThemeProvider
           attribute="class"
@@ -55,8 +54,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <NotificationBanner />
-          {children}
+          <TooltipProvider delayDuration={400}>
+            <ThemeClock />
+            {children}
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

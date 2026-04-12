@@ -1,7 +1,8 @@
 "use client";
 
-import type {AvailabilityPeriod, AvailabilityStat} from "@/lib/types";
-import {cn} from "@/lib/utils";
+import type { AvailabilityPeriod, AvailabilityStat } from "@/lib/types";
+import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 
 interface AvailabilityStatsProps {
   stats?: AvailabilityStat[] | null;
@@ -10,12 +11,21 @@ interface AvailabilityStatsProps {
 }
 
 const PERIOD_LABELS: Record<AvailabilityPeriod, string> = {
-  "7d": "7 天",
-  "15d": "15 天",
-  "30d": "30 天",
+  "7d":  "7d",
+  "15d": "15d",
+  "30d": "30d",
 };
 
-function getAvailabilityColorClass(pct: number | null | undefined): string {
+function getColorVar(pct: number | null | undefined, isMaintenance?: boolean): string {
+  if (isMaintenance) return "var(--status-maintenance)";
+  if (pct === null || pct === undefined) return "var(--muted-foreground)";
+  if (pct >= 99) return "var(--status-operational)";
+  if (pct >= 95) return "var(--status-degraded)";
+  return "var(--status-failed)";
+}
+
+function getTextClass(pct: number | null | undefined, isMaintenance?: boolean): string {
+  if (isMaintenance) return "text-[var(--status-maintenance)]";
   if (pct === null || pct === undefined) return "text-muted-foreground";
   if (pct >= 99) return "text-[var(--status-operational)]";
   if (pct >= 95) return "text-[var(--status-degraded)]";
@@ -23,45 +33,38 @@ function getAvailabilityColorClass(pct: number | null | undefined): string {
 }
 
 export function AvailabilityStats({ stats, period, isMaintenance }: AvailabilityStatsProps) {
-  const current = stats?.find((item) => item.period === period);
+  const current = stats?.find((s) => s.period === period);
   const pct = current?.availabilityPct ?? null;
   const pctLabel = pct === null ? "—" : `${pct.toFixed(2)}%`;
+  const subLabel = current
+    ? `${current.operationalCount}/${current.totalChecks} checks`
+    : isMaintenance
+    ? "paused"
+    : "no data";
 
-  if (isMaintenance) {
-    return (
-      <div className="flex items-center justify-between rounded-lg border border-dashed border-[var(--status-maintenance)]/30 bg-[var(--status-maintenance)]/5 px-3 py-2">
-        <div className="space-y-1">
-          <p className="text-2xs font-semibold uppercase tracking-wider text-[var(--status-maintenance)]">
-            可用性 ({PERIOD_LABELS[period]})
+  const colorVar = getColorVar(pct, isMaintenance);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <div>
+          <p className="text-2xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Availability {PERIOD_LABELS[period]}
           </p>
-          <p className="text-2xs text-[var(--status-maintenance)]/70">
-            {current
-              ? `维护前 ${current.operationalCount}/${current.totalChecks} 成功`
-              : "维护中 · 已暂停统计"}
-          </p>
+          <p className="mt-0.5 text-2xs text-muted-foreground/60">{subLabel}</p>
         </div>
-        <span className="font-mono text-sm font-bold text-[var(--status-maintenance)]">
+        <span className={cn("font-mono text-base font-semibold tabular-nums leading-none", getTextClass(pct, isMaintenance))}>
           {pctLabel}
         </span>
       </div>
-    );
-  }
 
-  return (
-    <div className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
-      <div className="space-y-1">
-        <p className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-          可用性 ({PERIOD_LABELS[period]})
-        </p>
-        <p className="text-2xs text-muted-foreground">
-          {current
-            ? `${current.operationalCount}/${current.totalChecks} 成功`
-            : "暂无数据"}
-        </p>
+      {/* Progress bar — override --primary with the status color */}
+      <div style={{ "--primary": colorVar } as React.CSSProperties}>
+        <Progress
+          value={pct ?? 0}
+          className="h-1 rounded-sm bg-muted/50"
+        />
       </div>
-      <span className={cn("font-mono text-sm font-bold", getAvailabilityColorClass(pct))}>
-        {pctLabel}
-      </span>
     </div>
   );
 }

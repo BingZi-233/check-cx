@@ -4,80 +4,70 @@ import React, { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { X, AlertCircle, Info, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { SystemNotificationRow } from "@/lib/types/database";
+import type { SystemNotificationRow } from "@/lib/types/database";
 import { cn } from "@/lib/utils/cn";
+
+const LEVEL_ACCENT: Record<string, string> = {
+  info:    "border-l-[var(--status-maintenance)]",
+  warning: "border-l-[var(--status-degraded)]",
+  error:   "border-l-[var(--status-failed)]",
+};
+
+const LEVEL_ICONS = {
+  info:    Info,
+  warning: AlertTriangle,
+  error:   AlertCircle,
+} as const;
 
 export function NotificationBanner() {
   const [notifications, setNotifications] = useState<SystemNotificationRow[]>([]);
   const [visible, setVisible] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [idx, setIdx] = useState(0);
 
   useEffect(() => {
-    async function fetchNotifications() {
-      try {
-        const response = await fetch("/api/notifications");
-        if (response.ok) {
-          const data = await response.json();
-          setNotifications(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch notifications:", error);
-      }
-    }
-    fetchNotifications();
+    fetch("/api/notifications")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setNotifications)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (notifications.length <= 1) return;
-
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % notifications.length);
-    }, 5000);
-
-    return () => clearInterval(interval);
+    const t = setInterval(() => setIdx((p) => (p + 1) % notifications.length), 5000);
+    return () => clearInterval(t);
   }, [notifications.length]);
 
-  if (!visible || notifications.length === 0) {
-    return null;
-  }
+  if (!visible || notifications.length === 0) return null;
 
-  const notification = notifications[currentIndex];
-
-  const levelStyles: Record<string, string> = {
-    info:    "border-[var(--status-maintenance)]/30 bg-[var(--status-maintenance)]/10 text-[var(--status-maintenance)]",
-    warning: "border-[var(--status-degraded)]/30 bg-[var(--status-degraded)]/10 text-[var(--status-degraded)]",
-    error:   "border-[var(--status-failed)]/30 bg-[var(--status-failed)]/10 text-[var(--status-failed)]",
-  };
-
-  const Icon = {
-    info: Info,
-    warning: AlertTriangle,
-    error: AlertCircle,
-  }[notification.level] ?? Info;
+  const n = notifications[idx];
+  const Icon = LEVEL_ICONS[n.level as keyof typeof LEVEL_ICONS] ?? Info;
+  const accentClass = LEVEL_ACCENT[n.level] ?? LEVEL_ACCENT.info;
 
   return (
-    <div className={cn(
-      "relative w-full border-b px-4 py-3 text-sm backdrop-blur-sm transition-all animate-in fade-in slide-in-from-top-2",
-      levelStyles[notification.level] ?? levelStyles.info
-    )}>
-      <div className="mx-auto flex max-w-[1600px] items-start gap-3 md:items-center">
-        <Icon className="mt-0.5 h-4 w-4 shrink-0 md:mt-0" />
-        <div className="flex-1 [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_p]:leading-relaxed">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {notification.message}
-          </ReactMarkdown>
+    <Alert
+      className={cn(
+        "rounded-none border-0 border-b border-l-4 px-4 py-2.5",
+        accentClass,
+        "[&>svg]:text-current"
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      <AlertDescription className="flex items-start justify-between gap-4">
+        <div className="flex-1 text-sm [&_a]:underline [&_a]:underline-offset-2 [&_p]:leading-snug">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{n.message}</ReactMarkdown>
         </div>
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setVisible(false)}
-          className="ml-2 h-7 w-7 shrink-0 rounded-full opacity-70 hover:opacity-100"
+          className="h-6 w-6 shrink-0 rounded opacity-50 hover:opacity-100"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
           <span className="sr-only">Dismiss</span>
         </Button>
-      </div>
-    </div>
+      </AlertDescription>
+    </Alert>
   );
 }
