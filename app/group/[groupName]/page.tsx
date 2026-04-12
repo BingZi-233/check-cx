@@ -1,6 +1,7 @@
 import {notFound} from "next/navigation";
 import Link from "next/link";
 import {ChevronLeft} from "lucide-react";
+import {Button} from "@/components/ui/button";
 
 import {GroupDashboardBootstrap} from "@/components/group-dashboard-bootstrap";
 import {getAvailableGroups} from "@/lib/core/group-data";
@@ -12,7 +13,6 @@ interface GroupPageProps {
   params: Promise<{ groupName: string }>;
 }
 
-// 生成页面元数据
 export async function generateMetadata({ params }: GroupPageProps) {
   const { groupName } = await params;
   const decodedGroupName = decodeURIComponent(groupName);
@@ -35,14 +35,12 @@ export default async function GroupPage({ params }: GroupPageProps) {
   return (
     <div className="min-h-screen py-8 md:py-16">
       <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-3 sm:gap-8 sm:px-6 lg:px-12">
-        {/* 返回首页链接 */}
-        <Link
-          href="/"
-          className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border/40 bg-background/60 px-4 py-1.5 text-sm font-medium text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-border/80 hover:text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          返回首页
-        </Link>
+        <Button variant="ghost" size="sm" asChild className="w-fit rounded-full border border-border/40 bg-background/60 backdrop-blur-sm">
+          <Link href="/">
+            <ChevronLeft className="h-4 w-4" />
+            返回首页
+          </Link>
+        </Button>
 
         <GroupDashboardBootstrap groupName={decodedGroupName} />
       </main>

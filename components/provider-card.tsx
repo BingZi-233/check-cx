@@ -6,6 +6,7 @@ import {ProviderIcon} from "@/components/provider-icon";
 import {StatusTimeline} from "@/components/status-timeline";
 import {AvailabilityStats} from "@/components/availability-stats";
 import {Badge} from "@/components/ui/badge";
+import {CornerPlus} from "@/components/ui/corner-plus";
 import type {AvailabilityPeriod, AvailabilityStat, ProviderTimeline} from "@/lib/types";
 import {OFFICIAL_STATUS_META, PROVIDER_LABEL, STATUS_META} from "@/lib/core/status";
 import {cn} from "@/lib/utils";
@@ -20,27 +21,13 @@ interface ProviderCardProps {
 const formatLatency = (value: number | null | undefined) =>
   typeof value === "number" ? `${value} ms` : "—";
 
-/** Tech-style decorative corner plus marker */
-const CornerPlus = ({ className }: { className?: string }) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1"
-    className={cn("absolute h-4 w-4 text-muted-foreground/40", className)}
-  >
-    <line x1="12" y1="0" x2="12" y2="24" />
-    <line x1="0" y1="12" x2="24" y2="12" />
-  </svg>
-);
-
 export function ProviderCard({
   timeline,
   timeToNextRefresh,
   availabilityStats,
   selectedPeriod,
 }: ProviderCardProps) {
-  const { id, latest, items } = timeline;
+  const { latest, items } = timeline;
   const preset = STATUS_META[latest.status];
   const isMaintenance = latest.status === "maintenance";
   const officialStatus = latest.officialStatus;
@@ -51,7 +38,7 @@ export function ProviderCard({
 
   return (
     <div className={cn(
-      "group relative flex flex-col overflow-hidden rounded-2xl border bg-background/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5",
+      "group relative flex flex-col overflow-hidden rounded-xl border bg-background/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5",
       banner
         ? banner.bannerBorder
         : "border-border/40 hover:border-primary/20"
@@ -72,13 +59,13 @@ export function ProviderCard({
             <p className="text-xs font-bold sm:text-sm">
               {banner.bannerLabel}
             </p>
-            <p className="mt-0.5 text-[11px] leading-snug opacity-80 sm:text-xs">
+            <p className="mt-0.5 text-2xs leading-snug opacity-80 sm:text-xs">
               {officialStatus.message || banner.description}
             </p>
             {officialStatus.affectedComponents && officialStatus.affectedComponents.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {officialStatus.affectedComponents.map((c, i) => (
-                  <span key={`${c}-${i}`} className="rounded bg-current/10 px-1.5 py-0.5 text-[10px] font-medium">
+                  <span key={`${c}-${i}`} className="rounded bg-current/10 px-1.5 py-0.5 text-2xs font-medium">
                     {c}
                   </span>
                 ))}
@@ -88,10 +75,10 @@ export function ProviderCard({
         </div>
       )}
 
-      <div className={cn("flex-1 p-4 sm:p-5", banner && "opacity-60")}>
+      <div className={cn("flex-1 p-5", banner && "opacity-60")}>
         <div className="mb-4 flex items-start justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-white/80 to-white/20 shadow-sm ring-1 ring-black/5 transition-transform group-hover:scale-105 dark:from-white/10 dark:to-white/5 dark:ring-white/10 sm:h-12 sm:w-12 sm:rounded-2xl">
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-white/80 to-white/20 shadow-sm ring-1 ring-black/5 transition-transform group-hover:scale-105 dark:from-white/10 dark:to-white/5 dark:ring-white/10 sm:h-12 sm:w-12">
               <div className="scale-75 sm:scale-100">
                 <ProviderIcon type={latest.type} size={26} className="text-foreground/80" />
               </div>
@@ -103,7 +90,7 @@ export function ProviderCard({
                 </h3>
                 <Badge
                   variant={preset.badge}
-                  className="shrink-0 whitespace-nowrap rounded-lg px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider shadow-sm backdrop-blur-md sm:px-2.5 sm:py-1 sm:text-xs"
+                  className="shrink-0 whitespace-nowrap rounded-md px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider shadow-sm backdrop-blur-md sm:px-2.5 sm:py-1 sm:text-xs"
                 >
                   {preset.label}
                 </Badge>
@@ -119,20 +106,20 @@ export function ProviderCard({
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-muted/30 p-3 transition-colors group-hover:bg-muted/50">
+          <div className="rounded-lg bg-muted/30 p-3 transition-colors group-hover:bg-muted/50">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Zap className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider">对话延迟</span>
+              <span className="text-2xs font-semibold uppercase tracking-wider">对话延迟</span>
             </div>
             <div className="mt-1 font-mono text-lg font-medium leading-none text-foreground">
               {formatLatency(latest.latencyMs)}
             </div>
           </div>
 
-          <div className="rounded-xl bg-muted/30 p-3 transition-colors group-hover:bg-muted/50">
+          <div className="rounded-lg bg-muted/30 p-3 transition-colors group-hover:bg-muted/50">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Radio className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider">端点 PING</span>
+              <span className="text-2xs font-semibold uppercase tracking-wider">端点 PING</span>
             </div>
             <div className="mt-1 font-mono text-lg font-medium leading-none text-foreground">
               {formatLatency(latest.pingLatencyMs)}
@@ -145,7 +132,6 @@ export function ProviderCard({
         </div>
       </div>
 
-      {/* Timeline Section - Visual separation */}
       <div className="border-t border-border/40 bg-muted/10 px-5 py-4">
         <StatusTimeline items={items} nextRefreshInMs={timeToNextRefresh} isMaintenance={isMaintenance} />
       </div>

@@ -5,6 +5,7 @@ import {useCallback, useEffect, useState} from "react";
 import {GroupDashboardView} from "@/components/group-dashboard-view";
 import {GroupDashboardSkeleton} from "@/components/dashboard-skeleton";
 import {fetchGroupWithCache} from "@/lib/core/group-frontend-cache";
+import {Button} from "@/components/ui/button";
 import type {GroupDashboardData} from "@/lib/core/group-data";
 import type {AvailabilityPeriod} from "@/lib/types";
 
@@ -81,13 +82,14 @@ export function GroupDashboardBootstrap({ groupName }: GroupDashboardBootstrapPr
           <div className="mt-6 flex justify-center">
             <div className="inline-flex items-center gap-3 rounded-full border border-border/60 bg-background/60 px-4 py-2 text-sm text-muted-foreground">
               <span>{errorMessage}</span>
-              <button
+              <Button
                 type="button"
+                size="sm"
                 onClick={() => loadData(true)}
-                className="rounded-full bg-foreground px-3 py-1 text-xs font-medium text-background transition-colors hover:bg-foreground/90"
+                className="rounded-full"
               >
                 重新加载
-              </button>
+              </Button>
             </div>
           </div>
         )}

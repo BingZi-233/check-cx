@@ -64,7 +64,7 @@ export function StatusTimeline({ items, nextRefreshInMs, isMaintenance }: Status
   if (items.length === 0) {
     if (isMaintenance) {
       return (
-        <div className="flex items-center justify-center rounded-lg border border-dashed border-blue-500/30 bg-blue-500/5 p-4 text-xs text-blue-500">
+        <div className="flex items-center justify-center rounded-lg border border-dashed border-[var(--status-maintenance)]/30 bg-[var(--status-maintenance)]/5 p-4 text-xs text-[var(--status-maintenance)]">
           维护中 · 已暂停时间线采集
         </div>
       );
@@ -86,7 +86,7 @@ export function StatusTimeline({ items, nextRefreshInMs, isMaintenance }: Status
   return (
     <div className="space-y-3">
       {/* Header / Legend */}
-      <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center justify-between text-2xs font-medium uppercase tracking-wider text-muted-foreground">
         <div className="flex items-center gap-2">
           <span>{segmentCount <= 1 ? "History (latest)" : `History (${segmentCount}pts)`}</span>
         </div>
@@ -156,8 +156,8 @@ export function StatusTimeline({ items, nextRefreshInMs, isMaintenance }: Status
                   className="w-64 space-y-3 rounded-xl border-border/50 bg-background/95 p-4 shadow-xl backdrop-blur-xl"
                 >
                    <div className="flex items-center justify-between border-b border-border/50 pb-2">
-                      <Badge variant={preset.badge} className="h-5 px-1.5 text-[10px]">{preset.label}</Badge>
-                      <ClientTime value={segment.checkedAt} className="font-mono text-[10px] text-muted-foreground" />
+                      <Badge variant={preset.badge} className="h-5 px-1.5 text-2xs">{preset.label}</Badge>
+                      <ClientTime value={segment.checkedAt} className="font-mono text-2xs text-muted-foreground" />
                    </div>
                    
                    <div className="grid gap-2 text-xs">
@@ -172,7 +172,7 @@ export function StatusTimeline({ items, nextRefreshInMs, isMaintenance }: Status
                    </div>
                    
                    {segment.message && (
-                     <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground break-words">
+                     <div className="rounded bg-muted/30 p-2 text-2xs text-muted-foreground break-words">
                        {segment.message}
                      </div>
                    )}
@@ -184,7 +184,7 @@ export function StatusTimeline({ items, nextRefreshInMs, isMaintenance }: Status
       </div>
       
       {/* Axis labels */}
-      <div className="flex justify-between text-[9px] font-medium uppercase tracking-widest text-muted-foreground/50">
+      <div className="flex justify-between text-2xs font-medium uppercase tracking-widest text-muted-foreground/50">
         <span>Past</span>
         <span>Now</span>
       </div>

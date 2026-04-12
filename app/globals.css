@@ -76,6 +76,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Status color tokens */
+  --status-operational: oklch(0.62 0.18 145);
+  --status-degraded:    oklch(0.72 0.18 78);
+  --status-failed:      oklch(0.58 0.22 27);
+  --status-error:       oklch(0.52 0.24 25);
+  --status-maintenance: oklch(0.55 0.16 250);
+  --status-validation:  oklch(0.68 0.2 50);
 }
 
 .dark {
@@ -110,6 +118,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Status color tokens — lighter for dark mode readability */
+  --status-operational: oklch(0.72 0.2 145);
+  --status-degraded:    oklch(0.8 0.19 78);
+  --status-failed:      oklch(0.67 0.22 27);
+  --status-error:       oklch(0.62 0.24 25);
+  --status-maintenance: oklch(0.65 0.16 250);
+  --status-validation:  oklch(0.75 0.2 50);
 }
 
 @layer base {
@@ -137,5 +153,12 @@
     mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
     opacity: 0.6;
     pointer-events: none;
+  }
+}
+
+@layer utilities {
+  .text-2xs {
+    font-size: 0.625rem;
+    line-height: 1rem;
   }
 }

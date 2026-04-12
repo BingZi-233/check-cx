@@ -6,6 +6,9 @@ import {Activity, ExternalLink, RefreshCcw} from "lucide-react";
 import {GroupTags} from "@/components/group-tags";
 import {ProviderCard} from "@/components/provider-card";
 import {ClientTime} from "@/components/client-time";
+import {CornerPlus} from "@/components/ui/corner-plus";
+import {PillToggle} from "@/components/ui/pill-toggle";
+import {Button} from "@/components/ui/button";
 import {fetchGroupWithCache, prefetchGroupData, setGroupCache} from "@/lib/core/group-frontend-cache";
 import type {AvailabilityPeriod, ProviderTimeline} from "@/lib/types";
 import type {GroupDashboardData} from "@/lib/core/group-data";
@@ -16,7 +19,6 @@ interface GroupDashboardViewProps {
   initialData: GroupDashboardData;
 }
 
-/** 计算所有 Provider 中最近一次检查的时间戳（毫秒） */
 const getLatestCheckTimestamp = (timelines: ProviderTimeline[]) => {
   const timestamps = timelines.map((timeline) =>
     new Date(timeline.latest.checkedAt).getTime()
@@ -41,20 +43,6 @@ const PERIOD_OPTIONS: Array<{ value: AvailabilityPeriod; label: string }> = [
   { value: "15d", label: "15 天" },
   { value: "30d", label: "30 天" },
 ];
-
-/** Tech-style decorative corner plus marker */
-const CornerPlus = ({ className }: { className?: string }) => (
-  <svg 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="1" 
-    className={cn("absolute h-4 w-4 text-muted-foreground/40", className)}
-  >
-    <line x1="12" y1="0" x2="12" y2="24" />
-    <line x1="0" y1="12" x2="24" y2="12" />
-  </svg>
-);
 
 /**
  * 分组 Dashboard 视图
@@ -160,7 +148,6 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
   const { providerTimelines, total, lastUpdated, pollIntervalLabel, displayName } = data;
   const { availabilityStats } = data;
 
-  // 根据卡片数量决定宽屏列数
   const gridColsClass = useMemo(() => {
     if (total > 4) {
       return "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
@@ -168,7 +155,6 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
     return "grid-cols-1 md:grid-cols-2";
   }, [total]);
 
-  // 计算状态统计
   const statusSummary = useMemo(() => {
     const counts = { operational: 0, degraded: 0, failed: 0, validation_failed: 0, maintenance: 0, error: 0 };
     for (const timeline of providerTimelines) {
@@ -197,7 +183,7 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
               Group View
             </span>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="max-w-2xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl md:text-6xl">
               {displayName}
@@ -214,41 +200,41 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
               </a>
             )}
           </div>
-          
-           <div className="flex flex-wrap items-center gap-2.5">
+
+          <div className="flex flex-wrap items-center gap-2.5">
             {statusSummary.operational > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
-                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-operational)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-operational)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-operational)]" />
                 {statusSummary.operational} 正常
               </span>
             )}
             {statusSummary.degraded > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-degraded)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-degraded)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-degraded)]" />
                 {statusSummary.degraded} 延迟
               </span>
             )}
             {statusSummary.failed > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-failed)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-failed)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-failed)]" />
                 {statusSummary.failed} 异常
               </span>
             )}
             {statusSummary.validation_failed > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-2.5 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-validation)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-validation)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-validation)]" />
                 {statusSummary.validation_failed} 验证失败
               </span>
             )}
             {statusSummary.error > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-600/10 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-600" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-error)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-error)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-error)]" />
                 {statusSummary.error} 错误
               </span>
             )}
-             {statusSummary.maintenance > 0 && (
-               <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+            {statusSummary.maintenance > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-maintenance)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--status-maintenance)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-maintenance)]" />
                 {statusSummary.maintenance} 维护
               </span>
             )}
@@ -258,67 +244,54 @@ export function GroupDashboardView({ groupName, initialData }: GroupDashboardVie
         </div>
 
         <div className="flex flex-col items-start gap-4 lg:items-end">
-           <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-             <span className="pl-1">可用性区间</span>
-             <div className="flex items-center gap-1 rounded-full bg-muted/30 p-0.5">
-               {PERIOD_OPTIONS.map((option) => (
-                 <button
-                   key={option.value}
-                   type="button"
-                   onClick={() => setSelectedPeriod(option.value)}
-                   className={cn(
-                     "rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors",
-                     selectedPeriod === option.value
-                       ? "bg-foreground text-background"
-                       : "text-muted-foreground hover:text-foreground"
-                   )}
-                 >
-                   {option.label}
-                 </button>
-               ))}
-             </div>
-           </div>
+          <PillToggle
+            label="可用性区间"
+            options={PERIOD_OPTIONS}
+            value={selectedPeriod}
+            onChange={setSelectedPeriod}
+          />
 
-           {/* Status Pill */}
-           <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-4 py-1.5 backdrop-blur-sm">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
-              </span>
-              <span className="text-xs font-semibold uppercase tracking-wider">Operational</span>
-           </div>
+          <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-4 py-1.5 backdrop-blur-sm">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--status-operational)] opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--status-operational)]" />
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Operational</span>
+          </div>
 
-           {lastUpdated && (
-             <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                  <RefreshCcw className={cn("h-3 w-3", isRefreshing && "animate-spin")} />
-                  <span>更新于 <ClientTime value={lastUpdated} /></span>
-                </div>
-                <span className="opacity-30">|</span>
-                <span>{pollIntervalLabel} 轮询</span>
-                <button
+          {lastUpdated && (
+            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <RefreshCcw className={cn("h-3 w-3", isRefreshing && "animate-spin")} />
+                <span>更新于 <ClientTime value={lastUpdated} /></span>
+              </div>
+              <span className="opacity-30">|</span>
+              <span>{pollIntervalLabel} 轮询</span>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => refresh(selectedPeriod, true)}
                   disabled={isRefreshing}
                   className={cn(
-                    "rounded-full border border-border/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:border-border/80 hover:text-foreground",
+                    "h-auto rounded-full border-border/60 px-3 py-1 text-2xs font-semibold uppercase tracking-wider",
                     isRefreshing && "cursor-not-allowed opacity-60"
                   )}
                 >
                   刷新
-                </button>
-             </div>
-           )}
+                </Button>
+            </div>
+          )}
         </div>
       </header>
 
       {total === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-border/50 bg-muted/20 py-20 text-center">
-            <div className="mb-4 rounded-full bg-muted/50 p-4">
-              <Activity className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-semibold">该分组下暂无配置</h3>
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/50 bg-muted/20 py-20 text-center">
+          <div className="mb-4 rounded-full bg-muted/50 p-4">
+            <Activity className="h-8 w-8 text-muted-foreground" />
           </div>
+          <h3 className="text-lg font-semibold">该分组下暂无配置</h3>
+        </div>
       ) : (
         <section className={`grid gap-6 ${gridColsClass}`}>
           {providerTimelines.map((timeline) => (
