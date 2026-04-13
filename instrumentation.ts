@@ -5,7 +5,8 @@
  * @see https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 export async function register() {
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    await import('@/lib/core/poller')
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { ensureBackendRuntime } = await import("@/lib/backend/runtime/bootstrap");
+    await ensureBackendRuntime();
   }
 }
