@@ -1,9 +1,9 @@
 {
   "name": "check-cx",
-  "version": "1.22.2",
+  "version": "1.22.3",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

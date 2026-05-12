@@ -121,6 +121,38 @@ COMMENT ON COLUMN public.group_info.group_name IS '分组名称，关联 check_c
 COMMENT ON COLUMN public.group_info.website_url IS '网站地址';
 COMMENT ON COLUMN public.group_info.tags IS '分组 Tag 列表，英文逗号分隔字符串';
 
+-- 后台用户目录表：存储邀请制用户、角色与预设分组
+CREATE TABLE public.admin_users (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    email           text NOT NULL,
+    role            text NOT NULL,
+    group_name      text,
+    auth_user_id    uuid,
+    invited_by      uuid REFERENCES public.admin_users(id) ON DELETE SET NULL,
+    is_active       boolean DEFAULT true,
+    invited_at      timestamptz DEFAULT now(),
+    activated_at    timestamptz,
+    created_at      timestamptz DEFAULT now(),
+    updated_at      timestamptz DEFAULT now(),
+
+    CONSTRAINT admin_users_email_key UNIQUE (email),
+    CONSTRAINT admin_users_auth_user_id_key UNIQUE (auth_user_id),
+    CONSTRAINT admin_users_role_check CHECK (role IN ('admin', 'member')),
+    CONSTRAINT admin_users_member_group_check CHECK (
+        role = 'admin' OR (group_name IS NOT NULL AND btrim(group_name) <> '')
+    )
+);
+
+COMMENT ON TABLE public.admin_users IS '后台用户目录表，存储邀请用户、角色和预设分组';
+COMMENT ON COLUMN public.admin_users.email IS '登录邮箱，统一使用小写';
+COMMENT ON COLUMN public.admin_users.role IS '后台角色：admin 或 member';
+COMMENT ON COLUMN public.admin_users.group_name IS '成员预设分组名；管理员可为空';
+COMMENT ON COLUMN public.admin_users.auth_user_id IS '首次登录后绑定的 Supabase Auth 用户 ID';
+COMMENT ON COLUMN public.admin_users.invited_by IS '邀请人，对应 admin_users.id';
+COMMENT ON COLUMN public.admin_users.is_active IS '是否启用该后台用户';
+COMMENT ON COLUMN public.admin_users.invited_at IS '邀请写入时间';
+COMMENT ON COLUMN public.admin_users.activated_at IS '首次成功登录激活时间';
+
 -- 系统通知表：存储全局系统通知
 CREATE TABLE public.system_notifications (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -160,6 +192,7 @@ CREATE INDEX idx_check_history_checked_at ON public.check_history (checked_at DE
 CREATE INDEX idx_history_config_checked ON public.check_history (config_id, checked_at DESC);
 CREATE INDEX idx_check_configs_model_id ON public.check_configs (model_id);
 CREATE INDEX idx_check_models_template_id ON public.check_models (template_id);
+CREATE INDEX idx_admin_users_role_group ON public.admin_users (role, group_name);
 
 -- -----------------------------------------------------------------------------
 -- 4. 视图
@@ -302,6 +335,11 @@ CREATE TRIGGER update_group_info_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION public.update_updated_at_column();
 
+CREATE TRIGGER update_admin_users_updated_at
+    BEFORE UPDATE ON public.admin_users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_updated_at_column();
+
 -- -----------------------------------------------------------------------------
 -- 7. RLS (Row Level Security)
 -- -----------------------------------------------------------------------------
@@ -311,6 +349,7 @@ ALTER TABLE public.check_models ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.check_request_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.check_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_info ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.check_poller_leases ENABLE ROW LEVEL SECURITY;
 

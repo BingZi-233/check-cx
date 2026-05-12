@@ -90,6 +90,27 @@ CREATE TABLE dev.group_info (
     CONSTRAINT group_info_group_name_key UNIQUE (group_name)
 );
 
+-- 后台用户目录表
+CREATE TABLE dev.admin_users (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    email text NOT NULL,
+    role text NOT NULL,
+    group_name text,
+    auth_user_id uuid,
+    invited_by uuid,
+    is_active boolean DEFAULT true,
+    invited_at timestamp with time zone DEFAULT now(),
+    activated_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT admin_users_pkey PRIMARY KEY (id),
+    CONSTRAINT admin_users_email_key UNIQUE (email),
+    CONSTRAINT admin_users_auth_user_id_key UNIQUE (auth_user_id),
+    CONSTRAINT admin_users_role_check CHECK ((role = ANY (ARRAY['admin'::text, 'member'::text]))),
+    CONSTRAINT admin_users_member_group_check CHECK (((role = 'admin'::text) OR ((group_name IS NOT NULL) AND (btrim(group_name) <> ''::text)))),
+    CONSTRAINT admin_users_invited_by_fkey FOREIGN KEY (invited_by) REFERENCES dev.admin_users(id) ON DELETE SET NULL
+);
+
 -- 系统通知表
 CREATE TABLE dev.system_notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -115,6 +136,9 @@ ON CONFLICT (lease_key) DO NOTHING;
 
 -- Enable RLS on group_info
 ALTER TABLE dev.group_info ENABLE ROW LEVEL SECURITY;
+
+-- Enable RLS on admin_users
+ALTER TABLE dev.admin_users ENABLE ROW LEVEL SECURITY;
 
 -- Create policy to allow read access for everyone
 CREATE POLICY "Allow public read access" ON dev.group_info
@@ -144,6 +168,9 @@ CREATE INDEX idx_dev_check_configs_model_id
 
 CREATE INDEX idx_dev_check_models_template_id
     ON dev.check_models USING btree (template_id);
+
+CREATE INDEX idx_dev_admin_users_role_group
+    ON dev.admin_users USING btree (role, group_name);
 
 CREATE INDEX idx_dev_check_history_checked_at
     ON dev.check_history USING btree (checked_at DESC);
@@ -284,12 +311,18 @@ BEFORE UPDATE ON dev.group_info
 FOR EACH ROW
 EXECUTE FUNCTION dev.update_updated_at_column();
 
+CREATE TRIGGER update_admin_users_updated_at
+BEFORE UPDATE ON dev.admin_users
+FOR EACH ROW
+EXECUTE FUNCTION dev.update_updated_at_column();
+
 -- 表与列注释
 COMMENT ON TABLE dev.check_configs IS 'AI 服务商配置表 - 存储各个 AI 服务商的 API 配置信息';
 COMMENT ON TABLE dev.check_models IS '模型配置表 - 存储可复用模型定义与模板绑定';
 COMMENT ON TABLE dev.check_request_templates IS '请求模板表 - 存储可复用请求头和 metadata 默认值';
 COMMENT ON TABLE dev.check_history IS '健康检测历史记录表 - 存储每次 API 健康检测的结果';
 COMMENT ON TABLE dev.group_info IS '分组信息表 - 存储分组的额外信息';
+COMMENT ON TABLE dev.admin_users IS '后台用户目录表 - 存储邀请用户、角色与预设分组';
 COMMENT ON TABLE dev.system_notifications IS '系统通知表 - 存储全局系统通知';
 COMMENT ON TABLE dev.check_poller_leases IS '轮询主节点租约表（单行租约）';
 
@@ -331,6 +364,14 @@ COMMENT ON COLUMN dev.check_history.config_id IS '配置 UUID - 关联 check_con
 COMMENT ON COLUMN dev.group_info.group_name IS '分组名称 - 关联 check_configs.group_name';
 COMMENT ON COLUMN dev.group_info.website_url IS '网站地址';
 COMMENT ON COLUMN dev.group_info.tags IS '分组 Tag 列表，英文逗号分隔字符串';
+COMMENT ON COLUMN dev.admin_users.email IS '登录邮箱 - 建议统一使用小写';
+COMMENT ON COLUMN dev.admin_users.role IS '后台角色 - admin 或 member';
+COMMENT ON COLUMN dev.admin_users.group_name IS '成员预设分组名；管理员可为空';
+COMMENT ON COLUMN dev.admin_users.auth_user_id IS '首次登录后绑定的 Supabase Auth 用户 ID';
+COMMENT ON COLUMN dev.admin_users.invited_by IS '邀请人，对应 admin_users.id';
+COMMENT ON COLUMN dev.admin_users.is_active IS '是否启用该后台用户';
+COMMENT ON COLUMN dev.admin_users.invited_at IS '邀请写入时间';
+COMMENT ON COLUMN dev.admin_users.activated_at IS '首次成功登录激活时间';
 
 COMMENT ON COLUMN dev.system_notifications.id IS '通知 UUID';
 COMMENT ON COLUMN dev.system_notifications.message IS '通知内容，支持 Markdown';
