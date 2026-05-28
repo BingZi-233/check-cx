@@ -10,8 +10,7 @@
 import "server-only";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
-// 开发模式使用 dev schema，生产模式使用 public schema
-const DB_SCHEMA = process.env.NODE_ENV === "development" ? "dev" : "public";
+import { getDbSchema } from "./db-schema";
 
 /**
  * 创建管理员客户端（绕过 RLS）
@@ -30,7 +29,7 @@ export function createAdminClient() {
   }
 
   return createSupabaseClient(supabaseUrl, serviceRoleKey, {
-    db: { schema: DB_SCHEMA },
+    db: { schema: getDbSchema() },
     auth: {
       autoRefreshToken: false,
       persistSession: false,

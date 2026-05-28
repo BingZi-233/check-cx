@@ -18,6 +18,12 @@
 
 其中 `SUPABASE_SERVICE_ROLE_KEY` 用于后台轮询、配置加载和租约续租，必须配置在服务端环境中，禁止暴露到客户端。
 
+### 可选（数据库 schema）
+
+- `SUPABASE_DB_SCHEMA`：显式指定 PostgREST 访问的 PostgreSQL schema（如 `public`、`dev`）。
+- 未设置时：`NODE_ENV=development` 使用 `dev`，否则使用 `public`。
+- 指定的 schema 必须在 Supabase **Exposed schemas** 中已暴露，且已执行对应的 `schema.sql` / `schema-dev.sql` 与迁移。
+
 ### 可选（运行参数）
 
 - `CHECK_NODE_ID`：节点标识（多节点部署必须唯一）
@@ -33,7 +39,7 @@
 - 生产/正式环境：执行 `supabase/schema.sql`
 - 本地开发（dev schema）：执行 `supabase/schema-dev.sql`
 
-> 提示：项目在 `NODE_ENV=development` 时使用 `dev` schema，`pnpm dev` 会自动设置该环境。
+> 提示：默认在 `NODE_ENV=development` 时使用 `dev` schema。若云库仅初始化 `public`，在环境变量中设置 `SUPABASE_DB_SCHEMA=public`。
 
 ### 3.2 升级已有项目
 

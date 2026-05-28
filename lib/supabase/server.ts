@@ -1,8 +1,7 @@
 import {createServerClient} from '@supabase/ssr'
 import {cookies} from 'next/headers'
 
-// 开发模式使用 dev schema，生产模式使用 public schema
-const DB_SCHEMA = process.env.NODE_ENV === 'development' ? 'dev' : 'public'
+import {getDbSchema} from './db-schema'
 
 /**
  * If using Fluid compute: Don't put this client in a global variable. Always create a new client within each
@@ -15,7 +14,7 @@ export async function createClient() {
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_PUBLISHABLE_OR_ANON_KEY!,
     {
-      db: { schema: DB_SCHEMA },
+      db: { schema: getDbSchema() },
       cookies: {
         getAll() {
           return cookieStore.getAll()

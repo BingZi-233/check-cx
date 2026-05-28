@@ -107,6 +107,7 @@ pnpm lint   # 代码检查
 | `SUPABASE_URL`                           | 是  | -       | Supabase 项目 URL             |
 | `SUPABASE_PUBLISHABLE_OR_ANON_KEY`       | 是  | -       | Supabase 公共访问 Key           |
 | `SUPABASE_SERVICE_ROLE_KEY`              | 是  | -       | Service Role Key（服务端使用，勿暴露） |
+| `SUPABASE_DB_SCHEMA`                     | 否  | 见说明     | PostgREST schema；未设置时 `development`→`dev`，否则 `public` |
 | `CHECK_NODE_ID`                          | 否  | `local` | 节点身份，用于多节点选主                |
 | `CHECK_POLL_INTERVAL_SECONDS`            | 否  | `60`    | 检测间隔（15–600 秒）              |
 | `CHECK_CONCURRENCY`                      | 否  | `5`     | 最大并发（1–20）                  |
