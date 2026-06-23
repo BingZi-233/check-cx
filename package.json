@@ -1,6 +1,6 @@
 {
   "name": "check-cx",
-  "version": "1.23.1",
+  "version": "1.23.2",
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.mjs",
