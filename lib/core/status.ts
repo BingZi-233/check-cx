@@ -5,32 +5,32 @@ export const STATUS_META: Record<
   {
     label: string;
     description: string;
-    badge: "success" | "warning" | "danger" | "secondary";
+    badge: "default" | "secondary" | "destructive";
     dot: string;
   }
 > = {
   operational: {
     label: "正常",
     description: "请求响应如常",
-    badge: "success",
+    badge: "default",
     dot: "bg-emerald-500",
   },
   degraded: {
     label: "延迟",
     description: "响应成功但耗时升高",
-    badge: "warning",
+    badge: "secondary",
     dot: "bg-amber-500",
   },
   failed: {
     label: "异常",
     description: "请求失败或超时",
-    badge: "danger",
+    badge: "destructive",
     dot: "bg-rose-500",
   },
   validation_failed: {
     label: "验证失败",
     description: "请求成功但回答未通过验证",
-    badge: "warning",
+    badge: "secondary",
     dot: "bg-orange-500",
   },
   maintenance: {
@@ -42,7 +42,7 @@ export const STATUS_META: Record<
   error: {
     label: "错误",
     description: "请求异常（网络错误、API报错、连接失败）",
-    badge: "danger",
+    badge: "destructive",
     dot: "bg-red-600",
   },
 };
