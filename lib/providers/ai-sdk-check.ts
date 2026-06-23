@@ -522,11 +522,14 @@ export async function checkWithAiSdk(config: ProviderConfig): Promise<CheckResul
     // 捕获流处理过程中的错误
     let streamError: AIApiCallError | null = null;
 
+    // 期望输出仅一个词：非推理模型锁死输出上限，省钱且防恶意端点猛吐输出刷成本。
+    // 推理模型的隐藏推理会占用输出预算，故不限制以免被饿死。
     const result = streamText({
       model,
       prompt: challenge.prompt,
       abortSignal: controller.signal,
       ...(providerOptions && { providerOptions }),
+      ...(reasoningEffort ? {} : { maxOutputTokens: 24 }),
       onError({ error }) {
         streamError = error as AIApiCallError;
       },
@@ -558,15 +561,15 @@ export async function checkWithAiSdk(config: ProviderConfig): Promise<CheckResul
     }
 
     // 验证答案
-    const { valid, extractedNumbers } = validateResponse(collectedResponse, challenge.expectedAnswer);
+    const { valid, normalized } = validateResponse(collectedResponse, challenge.expectedAnswer);
 
     if (!valid) {
-      const actualNumbers = extractedNumbers?.join(", ") || "(无数字)";
+      const actual = normalized || "(空)";
       return buildCheckResult(
         params,
         "validation_failed",
         latencyMs,
-        `回复验证失败: 期望 ${challenge.expectedAnswer}, 实际: ${actualNumbers}`
+        `回复验证失败: 期望 "${challenge.expectedAnswer}", 实际: "${actual}"`
       );
     }
 
